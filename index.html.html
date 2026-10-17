@@ -1,0 +1,3355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>9:16 图片合成与智能擦除 (AI换肤 + 区域分割擦除版)</title>
+<style>
+:root{--bg:#0a0b0e;--panel:#14161d;--card:#1c1e28;--accent:#4a6cf7;--danger:#eb5e55;--warning:#f1c40f;--text:#f0f2f8;--muted:#8a8d9e;--border:rgba(255,255,255,.12)}
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;background:var(--bg);overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--text);display:flex;justify-content:center;padding:10px;touch-action:pan-y}
+button,input,label{font:inherit}
+.checker{background-color:#121318;background-image:linear-gradient(45deg,#1e2029 25%,transparent 25%),linear-gradient(-45deg,#1e2029 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#1e2029 75%),linear-gradient(-45deg,transparent 75%,#1e2029 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0}
+.app{width:100%;max-width:440px;background:var(--panel);border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 36px #0009}
+.stage-wrap{width:100%;aspect-ratio:9/16;max-height:620px;border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative;touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;user-select:none}
+.stage{position:absolute;inset:0;overflow:hidden;touch-action:none;-webkit-touch-callout:none;user-select:none}
+.placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;pointer-events:none}
+.guide{position:absolute;background:#ff3b30;z-index:999;pointer-events:none;display:none}.gv{top:0;bottom:0;width:1px;left:50%}.gh{left:0;right:0;height:1px;top:50%}
+.layer{position:absolute;top:50%;left:50%;transform-origin:center;cursor:grab;pointer-events:none;border:1.5px dashed transparent;max-width:none;max-height:none;touch-action:none;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.layer.active{pointer-events:auto;border-color:var(--accent);box-shadow:0 0 12px #4a6cf766}.layer.locked{border-color:var(--warning)!important}
+.uploads{display:flex;gap:8px;width:100%}.upload{flex:1;background:#1f2230;border:1px solid var(--accent);color:#fff;padding:10px;border-radius:8px;font-size:12px;font-weight:600;text-align:center}.upload input{display:none}
+.tabs{display:flex;gap:6px;width:100%;overflow:auto;padding-bottom:2px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{background:#ffffff0d;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:6px;font-size:11px;white-space:nowrap}.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sub{display:flex;width:100%;background:#0005;border-radius:8px;padding:3px;gap:2px}.sub button{flex:1;border:0;background:transparent;color:var(--muted);padding:7px 0;font-size:12px;border-radius:6px}.sub button.active{background:var(--card);color:#fff}
+.panel{width:100%;background:var(--card);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--border)}.content{display:none;flex-direction:column;gap:8px}.content.active{display:flex}
+.row{display:flex;align-items:center;gap:6px;font-size:12px}.row label{width:58px;color:var(--muted);font-size:11px;flex-shrink:0}.row input[type=range]{flex:1;height:4px;accent-color:var(--accent);min-width:0}.val{width:42px;text-align:right;font:11px monospace;flex-shrink:0}
+.step-btn{width:28px;height:28px;flex-shrink:0;border-radius:6px;border:1px solid var(--border);background:#ffffff12;color:var(--text);font-size:16px;font-weight:700;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.step-btn:active{background:var(--accent);color:#fff;transform:scale(.94)}
+.step-btn:disabled{opacity:.3}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.btn{background:#ffffff0f;border:1px solid var(--border);color:var(--text);padding:8px 3px;border-radius:6px;font-size:11px;text-align:center}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.3}.primary{background:var(--accent);border-color:var(--accent);color:#fff}.danger{background:#eb5e5522;border-color:#eb5e554d;color:var(--danger)}.warning{background:#f1c40f22;border-color:#f1c40f4d;color:var(--warning)}
+.export{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent),#6a88ff);border:0;border-radius:10px;color:#fff;font-size:14px;font-weight:700}
+.overlay{position:fixed;inset:0;background:#08090c;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 8px;padding-bottom:0;gap:4px;overflow-y:auto;overflow-x:hidden;touch-action:none;box-sizing:border-box;height:100%;height:100dvh;-webkit-overflow-scrolling:touch}
+.header,.controls{width:100%;max-width:420px;flex-shrink:0}
+.header{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0;min-height:28px}
+.box{position:relative;width:100%;max-width:420px;flex:1 1 0;min-height:180px;height:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;touch-action:none;-webkit-touch-callout:none;user-select:none;background:#121318}
+#eraseOverlay{
+  gap:0!important;
+  padding:2px 6px 0!important;
+  padding-bottom:0!important;
+  overflow:hidden!important;
+  justify-content:flex-start!important;
+}
+#eraseOverlay .box{flex:1 1 0;min-height:160px;height:0;margin:0}
+#eraseOverlay .header{padding:2px 0;min-height:24px;flex-shrink:0}
+#eraseOverlay .controls{
+  gap:3px;
+  flex-shrink:0;
+  max-height:46vh;
+  overflow-y:auto;
+  padding:4px 0;
+  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 4px)!important;
+  margin:0;
+  width:100%;
+  max-width:420px;
+  background:#08090c;
+}
+#eraseOverlay .controls .panel{padding:4px 6px;gap:2px}
+#eraseOverlay .controls .btn{padding:5px 2px;font-size:11px}
+#eraseOverlay .controls .upload{padding:7px;font-size:12px}
+#eraseOverlay .controls .grid{gap:3px}
+#eraseOverlay > div[style*="font-size"]{flex-shrink:0;padding:1px 0!important;margin:0!important}
+.box canvas{position:absolute;top:50%;left:50%;transform-origin:center;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+.ref{position:absolute;top:50%;left:50%;transform-origin:center;pointer-events:none;z-index:2;-webkit-touch-callout:none;user-select:none}
+.controls{display:flex;flex-direction:column;gap:4px;padding-bottom:2px}
+.controls .panel{padding:6px 8px;gap:4px}
+.controls .row{font-size:11px}
+.controls .grid{gap:4px}
+.controls .btn{padding:6px 3px;font-size:11px}
+.controls .upload{padding:8px;font-size:12px}
+.mag{position:fixed;width:80px;height:80px;border-radius:50%;border:2px solid white;pointer-events:none;display:none;z-index:2000;overflow:hidden;background:#000}.mag canvas{width:100%;height:100%}
+.save{position:fixed;inset:0;background:#000f;backdrop-filter:blur(8px);z-index:3000;display:none;flex-direction:column;align-items:center;justify-content:center;padding:15px;gap:10px}.saveTip{font-size:12px;background:#ffffff1a;padding:7px 14px;border-radius:12px}.previewWrap{position:relative;max-width:90vw;max-height:65vh;aspect-ratio:9/16;overflow:hidden;border-radius:8px;border:1px solid var(--border);touch-action:none;-webkit-touch-callout:none;user-select:none}.previewWrap canvas{display:block;width:100%;height:100%;object-fit:contain;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;pointer-events:none}.crop{position:absolute;border:2px dashed var(--accent);box-shadow:0 0 0 9999px #000a;touch-action:none}.handle{position:absolute;width:26px;height:26px;background:#fff;border:2px solid var(--accent);border-radius:50%}
+.tl{left:-8px;top:-8px}.tr{right:-8px;top:-8px}.bl{left:-8px;bottom:-8px}.br{right:-8px;bottom:-8px}
+.crop-handle{width:28px!important;height:28px!important;margin:0!important;z-index:20;touch-action:none;}
+.handle-tl{top:-14px!important;left:-14px!important;}
+.handle-tr{top:-14px!important;right:-14px!important;}
+.handle-bl{bottom:-14px!important;left:-14px!important;}
+.handle-br{bottom:-14px!important;right:-14px!important;}
+.guide-line{background:rgba(255,59,48,.95)!important;box-shadow:0 0 4px rgba(255,59,48,.65);z-index:9999!important;}
+.guide-line.v-line,.guide-line.h-line{display:none;pointer-events:none;}
+.guide-line.v-line{top:0;bottom:0;width:2px;left:50%;transform:translateX(-1px);}
+.guide-line.h-line{left:0;right:0;height:2px;top:50%;transform:translateY(-1px);}
+img,canvas,.layer,.stage,.stage-wrap,.box,.previewWrap,.ref{-webkit-touch-callout:none!important;-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}
+</style>
+</head>
+<body>
+<div class="mag" id="mag"><canvas id="magCanvas" width="80" height="80"></canvas></div>
+
+<div class="save" id="save">
+  <div class="saveTip">✂️ 裁剪框固定 9:16，拖动四角可调整大小</div>
+  <div class="previewWrap" id="previewWrap">
+    <canvas id="preview"></canvas>
+    <div class="crop" id="crop">
+      <i class="handle tl" data-h="tl"></i><i class="handle tr" data-h="tr"></i>
+      <i class="handle bl" data-h="bl"></i><i class="handle br" data-h="br"></i>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;width:100%;max-width:330px">
+    <button class="btn primary" style="flex:1;padding:11px" id="saveBtn">💾 保存到照片</button>
+    <button class="btn" style="flex:1;padding:11px;background:#333" id="closeSave">关闭</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="stage-wrap checker" id="stageWrap">
+    <div class="stage" id="stage">
+      <div class="guide gv" id="gv"></div><div class="guide gh" id="gh"></div>
+      <div class="placeholder" id="placeholder"><span style="font-size:36px">🖼️</span><span>添加背景图或贴图</span></div>
+      <div id="mainVLine" style="position:absolute;top:0;bottom:0;width:28px;left:50%;transform:translateX(-50%);z-index:40;touch-action:none;cursor:ew-resize;background:transparent">
+        <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:rgba(255,200,0,0.95);box-shadow:0 0 4px rgba(255,200,0,0.7);pointer-events:none"></div>
+      </div>
+      <div id="mainHLine" style="position:absolute;left:0;right:0;height:28px;top:50%;transform:translateY(-50%);z-index:40;touch-action:none;cursor:ns-resize;background:transparent">
+        <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(0,220,160,0.95);box-shadow:0 0 4px rgba(0,220,160,0.7);pointer-events:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="uploads">
+    <label class="upload">🖼️ 背景图<input id="bg" type="file" accept="image/*"></label>
+    <label class="upload">🎨 贴图<input id="fg" type="file" accept="image/*" multiple></label>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="sub">
+    <button class="active" data-tab="transform">变换与图层</button>
+    <button data-tab="color">调色滤镜</button>
+    <button data-tab="shadow">立体阴影</button>
+  </div>
+
+  <div class="panel">
+    <div class="content active" id="transform">
+      <button class="btn primary" id="autoMatch" style="padding:10px;font-size:12px" disabled>🤖 自动对齐人物</button>
+      <div id="autoMatchStatus" style="display:none;font-size:11px;color:var(--muted);text-align:center;padding:2px 0;line-height:1.45"></div>
+
+      <div class="row"><label>左右缩放</label><button type="button" class="step-btn" data-step="scaleX" data-dir="-1" disabled>−</button><input id="scaleX" type="range" min="10" max="300" value="100" disabled><button type="button" class="step-btn" data-step="scaleX" data-dir="1" disabled>+</button><span class="val" id="scaleXV">100%</span></div>
+      <div class="row"><label>上下缩放</label><button type="button" class="step-btn" data-step="scaleY" data-dir="-1" disabled>−</button><input id="scaleY" type="range" min="10" max="300" value="100" disabled><button type="button" class="step-btn" data-step="scaleY" data-dir="1" disabled>+</button><span class="val" id="scaleYV">100%</span></div>
+      <div class="row"><label>旋转</label><button type="button" class="step-btn" data-step="rotate" data-dir="-1" disabled>−</button><input id="rotate" type="range" min="-180" max="180" value="0" step="1" disabled><button type="button" class="step-btn" data-step="rotate" data-dir="1" disabled>+</button><span class="val" id="rotateV">0°</span></div>
+      <div class="row"><label>不透明度</label><input id="opacity" type="range" min="0" max="100" value="100" disabled><span class="val" id="opacityV">100%</span></div>
+      <div class="grid">
+        <button class="btn primary" id="erase" disabled>✂️ 擦除</button><button class="btn" id="flip" disabled>↔️ 镜像</button><button class="btn" id="clone" disabled>👯 复制</button><button class="btn warning" id="lock" disabled>🔒 锁定</button>
+      </div>
+      <div class="grid"><button class="btn" id="top" disabled>🔝 置顶</button><button class="btn" id="up" disabled>🔼 上移</button><button class="btn" id="down" disabled>🔽 下移</button><button class="btn" id="bottom" disabled>🔽 置底</button></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr"><button class="btn" id="compare" disabled>↔️ 分屏</button><button class="btn" id="blink" disabled>👁️ 闪烁</button><button class="btn" id="diffBlend" disabled>⚡ 差值</button></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr"><button class="btn" id="cropPatch" disabled>🩹 裁为补丁</button><button class="btn danger" id="del" disabled>🗑️ 删除图层</button></div>
+    </div>
+
+    <div class="content" id="color">
+      <div class="row"><label>亮度</label><input id="bright" type="range" min="-100" max="100" value="0" disabled><span class="val" id="brightV">0</span></div>
+      <div class="row"><label>对比度</label><input id="contrast" type="range" min="-100" max="100" value="0" disabled><span class="val" id="contrastV">0</span></div>
+      <div class="row"><label>饱和度</label><input id="saturate" type="range" min="-100" max="100" value="0" disabled><span class="val" id="saturateV">0</span></div>
+      <div class="row"><label>色相</label><input id="hue" type="range" min="-180" max="180" value="0" disabled><span class="val" id="hueV">0°</span></div>
+
+      <div class="row" style="gap:8px;margin-top:4px">
+        <label>参考肤色</label>
+        <div id="skinSwatch" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:#666;flex-shrink:0"></div>
+        <span id="skinHex" style="font:11px monospace;color:var(--muted);flex:1">未选取</span>
+        <button type="button" class="btn" id="copySkinHex" style="padding:6px 10px;font-size:11px;flex-shrink:0" disabled>📋 复制</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.45">① 点「画布取色」吸取目标肤色 ② 点「AI 锁定换肤」（优先联网AI模型，失败自动离线）</div>
+      <div class="row"><label>强度</label><input id="skinStrength" type="range" min="10" max="100" value="85" disabled><span class="val" id="skinStrengthV">85%</span></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button class="btn" id="pickSkin">🎯 画布取色</button>
+        <button class="btn primary" id="skinPaintBtn" disabled>🤖 AI 锁定换肤</button>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button class="btn" id="restoreSkin" disabled>↩️ 复原肤色</button>
+        <button class="btn" id="resetColor" disabled>↺ 重置滤镜</button>
+      </div>
+      <div id="skinLockStatus" style="display:none;font-size:11px;color:var(--muted);text-align:center;line-height:1.45;padding:2px 0"></div>
+    </div>
+
+    <div class="content" id="shadow">
+      <div class="row"><label>模糊</label><input id="shadowBlur" type="range" min="0" max="50" value="0" disabled><span class="val" id="shadowBlurV">0px</span></div>
+      <div class="row"><label>X偏移</label><input id="shadowX" type="range" min="-30" max="30" value="0" disabled><span class="val" id="shadowXV">0px</span></div>
+      <div class="row"><label>Y偏移</label><input id="shadowY" type="range" min="-30" max="30" value="0" disabled><span class="val" id="shadowYV">0px</span></div>
+      <div class="row"><label>颜色</label><input id="shadowColor" type="color" value="#000000" disabled><span style="flex:1"></span></div>
+      <button class="btn" id="resetShadow" disabled>↺ 重置阴影</button>
+    </div>
+  </div>
+  <button class="export" id="export" disabled>💾 导出 9:16 图片</button>
+</div>
+
+<!-- 分屏对比 Overlay -->
+<div class="overlay" id="compareOverlay" style="display:none">
+  <div class="header">
+    <b style="color:var(--accent)">↔️ 左右分屏对比</b>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <select id="refSelect" style="background:#1c1e28;color:#fff;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;max-width:90px"></select>
+      <button class="btn primary" id="aiPoseAlign" style="font-size:11px">🧍 AI扫描对齐</button>
+      <button class="btn" id="alignHeight" style="font-size:11px">↕️ 对齐身高</button>
+      <button class="btn" id="alignWidth" style="font-size:11px">↔️ 对齐宽度</button>
+      <button class="btn" id="syncZoom" style="font-size:11px">🔗 同步:关</button>
+      <button class="btn" id="nudgeToggle" style="font-size:11px">🎛️ 微调</button>
+      <button class="btn" id="exitCompare">退出</button>
+    </div>
+  </div>
+  <div id="compareBox" style="flex:1 1 0;min-height:0;display:flex;flex-direction:row;width:100%;max-width:420px;gap:0;position:relative;border:1px solid var(--border);border-radius:10px;overflow:hidden;touch-action:none;overscroll-behavior:none">
+    <div style="flex:1;position:relative;overflow:hidden;background:#121318;min-width:0" class="checker" id="refStage">
+      <div style="position:absolute;top:4px;left:6px;font-size:10px;color:var(--muted);z-index:6;background:#000a;padding:2px 5px;border-radius:4px">参考（固定）</div>
+      <img id="refImg" style="position:absolute;top:50%;left:50%;transform-origin:center;pointer-events:none;max-width:none;max-height:none">
+      <div id="nudgePad" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:30;display:none;flex-direction:column;align-items:center;gap:3px;background:rgba(0,0,0,0.55);border-radius:12px;padding:6px 8px;backdrop-filter:blur(6px)">
+        <div style="font-size:9px;color:#aaa;margin-bottom:2px">调右侧</div>
+        <button type="button" class="nudge-btn" data-nudge="up" style="width:36px;height:28px;border:0;border-radius:6px;background:#ffffff22;color:#fff;font-size:14px;touch-action:manipulation">↑</button>
+        <div style="display:flex;gap:3px">
+          <button type="button" class="nudge-btn" data-nudge="left" style="width:36px;height:28px;border:0;border-radius:6px;background:#ffffff22;color:#fff;font-size:14px;touch-action:manipulation">←</button>
+          <button type="button" class="nudge-btn" data-nudge="down" style="width:36px;height:28px;border:0;border-radius:6px;background:#ffffff22;color:#fff;font-size:14px;touch-action:manipulation">↓</button>
+          <button type="button" class="nudge-btn" data-nudge="right" style="width:36px;height:28px;border:0;border-radius:6px;background:#ffffff22;color:#fff;font-size:14px;touch-action:manipulation">→</button>
+        </div>
+        <div style="display:flex;gap:3px;margin-top:2px">
+          <button type="button" class="nudge-btn" data-nudge="taller" style="width:36px;height:26px;border:0;border-radius:6px;background:#4a6cf744;color:#fff;font-size:10px;touch-action:manipulation">↑高</button>
+          <button type="button" class="nudge-btn" data-nudge="shorter" style="width:36px;height:26px;border:0;border-radius:6px;background:#4a6cf744;color:#fff;font-size:10px;touch-action:manipulation">↓矮</button>
+          <button type="button" class="nudge-btn" data-nudge="wider" style="width:36px;height:26px;border:0;border-radius:6px;background:#f1c40f33;color:#fff;font-size:10px;touch-action:manipulation">←宽</button>
+          <button type="button" class="nudge-btn" data-nudge="thinner" style="width:36px;height:26px;border:0;border-radius:6px;background:#f1c40f33;color:#fff;font-size:10px;touch-action:manipulation">窄→</button>
+        </div>
+      </div>
+    </div>
+    <div id="compareDivider" style="width:8px;background:var(--accent);cursor:col-resize;flex-shrink:0;touch-action:none;display:flex;align-items:center;justify-content:center;z-index:10">
+      <div style="width:3px;height:40px;background:#fff;border-radius:2px"></div>
+    </div>
+    <div style="flex:1;position:relative;overflow:hidden;background:#121318;min-width:0" class="checker" id="editStage">
+      <div style="position:absolute;top:4px;left:6px;font-size:10px;color:var(--accent);z-index:6;background:#000a;padding:2px 5px;border-radius:4px">可编辑</div>
+      <img id="editImg" style="position:absolute;top:50%;left:50%;transform-origin:center;cursor:grab;max-width:none;max-height:none;touch-action:none">
+    </div>
+    <div id="guideLine1" class="compare-guide" style="position:absolute;left:0;right:0;height:32px;top:calc(18% - 16px);z-index:20;touch-action:none;cursor:ns-resize;background:transparent">
+      <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(255,59,48,0.95);box-shadow:0 0 4px rgba(255,59,48,0.7)"></div>
+      <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:26px;background:rgba(255,59,48,0.92);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;pointer-events:none">1</div>
+    </div>
+    <div id="guideLine4" class="compare-guide" style="position:absolute;left:0;right:0;height:32px;top:calc(72% - 16px);z-index:20;touch-action:none;cursor:ns-resize;background:transparent">
+      <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(251,191,36,0.95);box-shadow:0 0 4px rgba(251,191,36,0.7)"></div>
+      <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:26px;background:rgba(251,191,36,0.92);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;pointer-events:none">4</div>
+    </div>
+    <div id="centerGuideL" class="compare-vguide" style="position:absolute;top:0;bottom:0;width:32px;left:25%;transform:translateX(-50%);z-index:20;touch-action:none;cursor:ew-resize;background:transparent">
+      <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:rgba(255,200,0,0.95);box-shadow:0 0 4px rgba(255,200,0,0.7)"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;background:rgba(255,200,0,0.95);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;pointer-events:none">L</div>
+    </div>
+    <div id="centerGuideR" class="compare-vguide" style="position:absolute;top:0;bottom:0;width:32px;left:75%;transform:translateX(-50%);z-index:20;touch-action:none;cursor:ew-resize;background:transparent">
+      <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;background:rgba(255,200,0,0.95);box-shadow:0 0 4px rgba(255,200,0,0.7)"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:28px;height:28px;background:rgba(255,200,0,0.95);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;pointer-events:none">R</div>
+    </div>
+    <div id="markHead" class="right-mark" style="position:absolute;left:50%;right:0;height:28px;top:calc(22% - 14px);z-index:26;touch-action:none;cursor:ns-resize;background:transparent">
+      <div style="position:absolute;left:8px;right:8px;top:50%;height:2px;margin-top:-1px;background:rgba(255,100,180,0.95);box-shadow:0 0 4px rgba(255,100,180,0.6)"></div>
+      <div style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,100,180,0.95);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;pointer-events:none">头</div>
+    </div>
+    <div id="markFoot" class="right-mark" style="position:absolute;left:50%;right:0;height:28px;top:calc(78% - 14px);z-index:26;touch-action:none;cursor:ns-resize;background:transparent">
+      <div style="position:absolute;left:8px;right:8px;top:50%;height:2px;margin-top:-1px;background:rgba(180,100,255,0.95);box-shadow:0 0 4px rgba(180,100,255,0.6)"></div>
+      <div style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(180,100,255,0.95);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;pointer-events:none">脚</div>
+    </div>
+    <div id="widthRulerL" class="width-caliper" style="position:absolute;left:6%;width:38%;top:30%;height:40px;z-index:25;touch-action:none;cursor:move">
+      <div class="caliper-bar" style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(0,220,160,0.95);box-shadow:0 0 4px rgba(0,220,160,0.6)"></div>
+      <div class="caliper-tick-l" style="position:absolute;left:0;top:15%;bottom:15%;width:3px;background:rgba(0,220,160,0.95);border-radius:2px"></div>
+      <div class="caliper-tick-r" style="position:absolute;right:0;top:15%;bottom:15%;width:3px;background:rgba(0,220,160,0.95);border-radius:2px"></div>
+      <div class="caliper-handle-l" data-side="l" style="position:absolute;left:-14px;top:0;width:28px;height:40px;touch-action:none;cursor:ew-resize"></div>
+      <div class="caliper-handle-r" data-side="r" style="position:absolute;right:-14px;top:0;width:28px;height:40px;touch-action:none;cursor:ew-resize"></div>
+      <div class="caliper-label" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,180,130,0.95);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;pointer-events:none;white-space:nowrap">左尺</div>
+    </div>
+    <div id="markShoulder" style="position:absolute;left:62%;width:30%;top:calc(30% - 14px);height:28px;z-index:26;touch-action:none;cursor:move;background:transparent">
+      <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(96,165,250,0.95);box-shadow:0 0 4px rgba(96,165,250,0.6)"></div>
+      <div style="position:absolute;left:0;top:18%;bottom:18%;width:2px;background:rgba(96,165,250,0.95)"></div>
+      <div style="position:absolute;right:0;top:18%;bottom:18%;width:2px;background:rgba(96,165,250,0.95)"></div>
+      <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(59,130,246,0.95);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;pointer-events:none">肩</div>
+    </div>
+  </div>
+  <div id="measureReadout" style="width:100%;max-width:420px;padding:6px 8px;font-size:12px;color:#e8eaed;text-align:center;background:#1c1e28;border-radius:8px;margin-top:4px;line-height:1.5;min-height:40px;box-sizing:border-box">身高比 — · 宽度 — · 线距 —</div>
+  <div id="poseStatus" role="status" aria-live="polite" style="width:100%;max-width:420px;padding:7px 9px;font-size:12px;color:#e8eaed;text-align:left;background:#202330;border:1px solid #41475a;border-radius:8px;margin-top:4px;line-height:1.45;box-sizing:border-box">AI状态：尚未启动。此功能需要联网加载人体关键点模型。</div>
+  <div style="width:100%;max-width:420px;padding:2px 0;font-size:10px;color:var(--muted);text-align:center">对齐宽度：左尺量左肩 · 右「肩」放右肩高度 · 按该高度实际宽度缩放</div>
+</div>
+
+<!-- 裁为补丁 -->
+<div class="overlay" id="patchOverlay" style="display:none">
+  <div class="header">
+    <b style="color:var(--accent)">🩹 手动裁为补丁</b>
+    <div style="display:flex;gap:6px">
+      <button class="btn" id="cancelPatch">取消</button>
+      <button class="btn primary" id="applyPatch">✅ 生成补丁</button>
+    </div>
+  </div>
+  <div class="box checker" id="patchBox" style="position:relative;touch-action:none;flex:1 1 0;min-height:280px;width:100%;max-width:420px">
+    <canvas id="patchCanvas" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);touch-action:none"></canvas>
+    <div id="patchCrop" style="position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 9999px rgba(0,0,0,0.5);touch-action:none;display:none;cursor:move">
+      <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:6px;pointer-events:none;white-space:nowrap">拖动选区</div>
+    </div>
+  </div>
+  <div style="width:100%;max-width:420px;padding:4px 0;font-size:11px;color:var(--muted);text-align:center">在画板上手动拖出补丁区域 · 不自动居中、不吸附 · 选好后可拖动微调</div>
+</div>
+
+<div class="overlay" id="eraseOverlay">
+  <div class="header"><b style="color:var(--accent)">✂️ 智能擦除</b><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+    <button class="btn" id="eraseZoomOut" style="font-size:11px">➖</button>
+    <button class="btn" id="eraseZoomReset" style="font-size:11px">1x</button>
+    <button class="btn" id="eraseZoomIn" style="font-size:11px">➕</button>
+    <button class="btn" id="magBtn">🔍 放大镜:关</button>
+  </div></div>
+  <div class="box checker" id="eraseBox" style="overflow:hidden;position:relative">
+    <!-- ★ 横切分割线：线以下=背景人物 · 线以上=贴图人物 -->
+    <div id="eraseSplitLine" style="position:absolute;left:0;right:0;height:28px;top:50%;transform:translateY(-50%);z-index:50;touch-action:none;cursor:ns-resize;display:none;background:transparent">
+      <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(255,80,120,0.95);box-shadow:0 0 6px rgba(255,80,120,0.7);pointer-events:none"></div>
+    </div>
+  </div>
+  <div style="font-size:9px;color:var(--muted);text-align:center;padding:1px 0 0;line-height:1.15;flex-shrink:0;margin:0">画面锁定 · 双指缩放 · 单指擦除</div>
+  <div class="controls">
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)"><button class="btn primary" id="eraseMode">🧼 橡皮擦</button><button class="btn" id="restoreMode">🖌️ 恢复</button><button class="btn" id="wandMode">🪄 魔术棒</button></div>
+
+    <!-- ★ AI 智能识别 + 区域分割 + 自动擦除 -->
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:6px">
+      <button class="btn" id="aiSmartErase" style="background:linear-gradient(135deg,#8b5cf6,#6366f1);border-color:#8b5cf6;color:#fff;font-weight:700">🤖 AI 扫描</button>
+      <button class="btn" id="regionSplitToggle" style="background:#ffffff12;border-color:var(--border);color:var(--muted);font-weight:600" disabled>📍 区域分割:关</button>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr;gap:6px;margin-top:2px">
+      <button class="btn" id="autoRegionErase" style="background:#ffffff12;border-color:var(--border);color:var(--muted);font-weight:700" disabled>⚡ 自动擦除（按区域）</button>
+    </div>
+    <div id="aiHint" style="font-size:9px;color:var(--muted);text-align:center;padding:0;line-height:1.25">①扫描 ②开分割拖粉线 ③自动擦除（线下=背景人物 · 线上=贴图）</div>
+    <div id="aiSmartStatus" style="display:none;font-size:11px;color:var(--muted);text-align:center;padding:2px 0;line-height:1.45"></div>
+
+    <div class="panel" id="brushPanel">
+      <div class="row"><label>笔触</label><input id="brush" type="range" min="2" max="100" value="20"><span class="val" id="brushV">20px</span></div>
+      <div class="row"><label>羽化</label><input id="feather" type="range" min="0" max="30" value="0"><span class="val" id="featherV">0px</span></div>
+    </div>
+    <div class="panel" id="wandPanel" style="display:none"><div class="row"><label>容差</label><input id="tol" type="range" min="1" max="100" value="30"><span class="val" id="tolV">30</span></div></div>
+    <div class="panel">
+      <div class="row"><label>亮度</label><input id="eraseBright" type="range" min="20" max="200" value="100"><span class="val" id="eraseBrightV">100%</span></div>
+      <div class="row"><label>参考层</label><input id="refOpacity" type="range" min="0" max="100" value="55"><span class="val" id="refOpacityV">55%</span></div>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr"><button class="btn" id="undo">↩️ 撤销</button><button class="btn danger" id="resetMask">🗑️ 重置</button></div>
+    <div class="uploads"><button class="upload" id="cancelErase">取消</button><button class="upload" id="applyErase" style="flex:2;background:var(--accent)">✅ 应用</button></div>
+  </div>
+</div>
+
+<script>
+(()=> {
+const $=id=>document.getElementById(id);
+const stage=$('stage'),wrap=$('stageWrap'),placeholder=$('placeholder');
+
+/* ========== 主屏可移动辅助线 ========== */
+(function(){
+  function bindGuide(id, axis){
+    const line=$(id);
+    if(!line)return;
+    let dragging=false,start=0,startPos=0;
+    const getPos=()=>{
+      const st=axis==='x'?line.style.left:line.style.top;
+      if(st&&st.endsWith('px'))return parseFloat(st);
+      return axis==='x' ? (line.offsetLeft+line.offsetWidth/2) : (line.offsetTop+line.offsetHeight/2);
+    };
+    const down=e=>{
+      e.preventDefault();e.stopPropagation();
+      const p=e.touches?e.touches[0]:e;
+      dragging=true;window.__mainGuideDrag=true;
+      start=axis==='x'?p.clientX:p.clientY;startPos=getPos();
+      line.setPointerCapture?.(e.pointerId);
+    };
+    const move=e=>{
+      if(!dragging)return;
+      e.preventDefault();e.stopPropagation();
+      const p=e.touches?e.touches[0]:e;
+      const size=axis==='x'?(stage.clientWidth||1):(stage.clientHeight||1);
+      let pos=startPos+((axis==='x'?p.clientX:p.clientY)-start);
+      pos=Math.max(4,Math.min(size-4,pos));
+      if(axis==='x'){line.style.left=pos+'px';line.style.transform='translateX(-50%)';}
+      else{line.style.top=pos+'px';line.style.transform='translateY(-50%)';}
+    };
+    const up=()=>{dragging=false;window.__mainGuideDrag=false;};
+    line.addEventListener('pointerdown',down);
+    line.addEventListener('touchstart',down,{passive:false});
+    window.addEventListener('pointermove',move,{capture:true});
+    window.addEventListener('touchmove',move,{passive:false,capture:true});
+    window.addEventListener('pointerup',up);
+    window.addEventListener('touchend',up);
+  }
+  bindGuide('mainVLine','x');
+  bindGuide('mainHLine','y');
+})();
+
+function blockSaveMenu(e){
+  if(e.target.closest('.stage,.stage-wrap,.layer,.box,.previewWrap,#crop,.ref,canvas,img')){
+    e.preventDefault();e.stopPropagation();return false;
+  }
+}
+['contextmenu','selectstart','dragstart','gesturestart'].forEach(ev=>{
+  document.addEventListener(ev, blockSaveMenu, {capture:true, passive:false});
+});
+
+let layers=[],active=null,nextId=1;
+
+function filter(l,shadow=true){
+  let s=`brightness(${100+l.bright}%) contrast(${100+l.contrast}%) saturate(${100+l.saturate}%) hue-rotate(${l.hue}deg)`;
+  if(shadow&&l.shadowBlur>0)s+=` drop-shadow(${l.shadowX}px ${l.shadowY}px ${l.shadowBlur}px ${l.shadowColor})`;
+  return s;
+}
+function update(l){
+  if(!l)return;
+  l.el.style.width=l.nw+'px';l.el.style.height=l.nh+'px';
+  const sx=l.scaleX!=null?l.scaleX:(l.scale||1);
+  const sy=l.scaleY!=null?l.scaleY:(l.scale||1);
+  l.el.style.transform=`translate(calc(-50% + ${l.x}px),calc(-50% + ${l.y}px)) rotate(${l.rotate}deg) scale(${sx*(l.flip?-1:1)},${sy})`;
+  l.el.style.opacity=l.opacity;l.el.style.filter=filter(l);l.el.classList.toggle('locked',l.locked);
+}
+function controls(on){
+ ['scaleX','scaleY','rotate','opacity','erase','flip','clone','lock','top','up','down','bottom','del','compare','blink','diffBlend','bright','contrast','saturate','hue','resetColor','restoreSkin','shadowBlur','shadowX','shadowY','shadowColor','resetShadow','skinPaintBtn','pickSkin','skinStrength'].forEach(x=>{const el=$(x);if(el)el.disabled=!on;});
+ document.querySelectorAll('.step-btn').forEach(b=>b.disabled=!on);
+ if(on){
+   $('compare').disabled = layers.length < 2;
+   $('blink').disabled = layers.length < 2;
+   $('diffBlend').disabled = layers.length < 2;
+   $('skinPaintBtn').disabled = !window.__refSkin;
+ }
+ $('cropPatch').disabled = layers.length < 1;
+ $('pickSkin').disabled = layers.length < 1;
+}
+function sync(l){
+ const sx=l.scaleX!=null?l.scaleX:(l.scale||1);
+ const sy=l.scaleY!=null?l.scaleY:(l.scale||1);
+ $('scaleX').value=sx*100;$('scaleXV').textContent=Math.round(sx*100)+'%';
+ $('scaleY').value=sy*100;$('scaleYV').textContent=Math.round(sy*100)+'%';
+ $('rotate').value=l.rotate;$('rotateV').textContent=Math.round(l.rotate)+'°';
+ $('opacity').value=l.opacity*100;$('opacityV').textContent=Math.round(l.opacity*100)+'%';
+ $('lock').textContent=l.locked?'🔓 解锁':'🔒 锁定';
+ [['bright','brightV','bright',''],['contrast','contrastV','contrast',''],['saturate','saturateV','saturate',''],['hue','hueV','hue','°'],['shadowBlur','shadowBlurV','shadowBlur','px'],['shadowX','shadowXV','shadowX','px'],['shadowY','shadowYV','shadowY','px']].forEach(a=>{$(a[0]).value=l[a[2]];$(a[1]).textContent=l[a[2]]+a[3]});
+ $('shadowColor').value=l.shadowColor;
+}
+function tabs(){
+ $('tabs').innerHTML='';
+ [...layers].reverse().forEach(l=>{let t=document.createElement('button');t.className='tab '+(l===active?'active':'');t.textContent=(l.locked?'🔒 ':'')+(l.bg?'🖼️ 背景':'🎨 贴图 '+l.id);t.onclick=()=>setActive(l);$('tabs').appendChild(t)});
+}
+function setActive(l){
+  layers.forEach(x=>x.el.classList.remove('active'));
+  active=l;
+  if(l){l.el.classList.add('active');controls(true);sync(l)}
+  else controls(false);
+  tabs();
+  if(typeof window.__updateAutoMatchState==='function') window.__updateAutoMatchState();
+}
+
+function addLayer(src,isBg,copy){
+ const img=new Image();img.className='layer';img.draggable=false;
+ img.setAttribute('draggable','false');img.setAttribute('unselectable','on');
+ img.style.webkitTouchCallout='none';img.style.webkitUserSelect='none';img.style.userSelect='none';
+ img.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();return false;},{passive:false});
+ img.addEventListener('dragstart',e=>{e.preventDefault();return false;},{passive:false});
+ img.oncontextmenu=e=>{e.preventDefault();return false;};
+ img.ondragstart=e=>{e.preventDefault();return false;};
+ const l=Object.assign({id:nextId++,el:img,src,originalSrc:src,trueOriginalSrc:src,x:0,y:0,scaleX:1,scaleY:1,rotate:0,flip:false,opacity:1,bg:isBg,nw:0,nh:0,locked:false,bright:0,contrast:0,saturate:0,hue:0,shadowBlur:0,shadowX:0,shadowY:0,shadowColor:'#000000',maskData:null},copy||{});
+ if(!l.trueOriginalSrc)l.trueOriginalSrc=l.originalSrc||l.src||src;
+ if(l.scale!=null && (l.scaleX==null||l.scaleY==null)){l.scaleX=l.scale;l.scaleY=l.scale;}
+ if(l.scaleX==null)l.scaleX=1;if(l.scaleY==null)l.scaleY=1;
+ let dragging=false,sx=0,sy=0,ox=0,oy=0,dist0=0,ang0=0,scale0X=1,scale0Y=1,rot0=0;
+ const pos=e=>e.touches?e.touches[0]:e;
+ const gestureStart=e=>{
+   if((typeof co!=='undefined'&&co&&co.style.display==='flex')||(typeof eo!=='undefined'&&eo&&eo.style.display==='flex'))return;
+   if(window.__mainVLineDrag||window.__mainGuideDrag)return;
+   if(e.target&&e.target.closest&&e.target.closest('#mainVLine'))return;
+   if(active!==l||l.locked)return;
+   e.stopPropagation();if(e.cancelable)e.preventDefault();
+   if(e.touches&&e.touches.length===2){dragging=false;let a=e.touches[0],b=e.touches[1];dist0=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);ang0=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;scale0X=l.scaleX;scale0Y=l.scaleY;rot0=l.rotate;return}
+   let p=pos(e);dragging=true;sx=p.clientX;sy=p.clientY;ox=l.x;oy=l.y;
+ };
+ const gestureMove=e=>{
+   if((typeof co!=='undefined'&&co&&co.style.display==='flex')||(typeof eo!=='undefined'&&eo&&eo.style.display==='flex'))return;
+   if(window.__mainVLineDrag||window.__mainGuideDrag){dragging=false;return;}
+   if(active!==l||l.locked)return;
+   if(e.touches&&e.touches.length===2){if(e.cancelable)e.preventDefault();let a=e.touches[0],b=e.touches[1],d=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY),an=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;if(!dist0)return;const f=d/dist0;l.scaleX=Math.max(.1,Math.min(3,scale0X*f));l.scaleY=Math.max(.1,Math.min(3,scale0Y*f));l.rotate=rot0+an-ang0;update(l);sync(l);return}
+   if(!dragging)return;if(e.cancelable)e.preventDefault();let p=pos(e),nx=ox+p.clientX-sx,ny=oy+p.clientY-sy;l.x=nx;l.y=ny;update(l);
+ };
+ const gestureEnd=()=>{dragging=false;$('gv').style.display='none';$('gh').style.display='none'};
+ img.addEventListener('touchstart',gestureStart,{passive:false});img.addEventListener('mousedown',gestureStart);
+ window.addEventListener('touchmove',gestureMove,{passive:false});window.addEventListener('mousemove',gestureMove);
+ window.addEventListener('touchend',gestureEnd,{passive:false});window.addEventListener('mouseup',gestureEnd);
+ img.onload=()=>{
+   if(!l.nw){let sw=wrap.clientWidth,sh=wrap.clientHeight,fit=Math.min(sw/img.naturalWidth,sh/img.naturalHeight);l.nw=img.naturalWidth*fit;l.nh=img.naturalHeight*fit}
+   if(isBg){layers=layers.filter(x=>!x.bg);layers.unshift(l);stage.prepend(img)}else{layers.push(l);stage.appendChild(img)}
+   placeholder.style.display='none';update(l);setActive(l);$('export').disabled=false;
+ };
+ img.src=src;
+}
+$('bg').onchange=e=>{let f=e.target.files[0];if(f){let r=new FileReader();r.onload=x=>addLayer(x.target.result,true);r.readAsDataURL(f)}};
+$('fg').onchange=e=>Array.from(e.target.files).forEach(f=>{let r=new FileReader();r.onload=x=>addLayer(x.target.result,false);r.readAsDataURL(f)});
+
+$('scaleX').oninput=e=>{if(active){active.scaleX=e.target.value/100;$('scaleXV').textContent=e.target.value+'%';update(active)}};
+$('scaleY').oninput=e=>{if(active){active.scaleY=e.target.value/100;$('scaleYV').textContent=e.target.value+'%';update(active)}};
+$('rotate').oninput=e=>{if(active){active.rotate=+e.target.value;$('rotateV').textContent=Math.round(active.rotate)+'°';update(active)}};
+(function(){
+  let holdT=null, repT=null;
+  const stop=()=>{if(holdT){clearTimeout(holdT);holdT=null;}if(repT){clearInterval(repT);repT=null;}};
+  function applyStep(kind, dir){
+    if(!active||active.locked)return;
+    if(kind==='scaleX'){let v=Math.round((active.scaleX||1)*100)+dir;v=Math.max(10,Math.min(300,v));active.scaleX=v/100;$('scaleX').value=v;$('scaleXV').textContent=v+'%';update(active);}
+    else if(kind==='scaleY'){let v=Math.round((active.scaleY||1)*100)+dir;v=Math.max(10,Math.min(300,v));active.scaleY=v/100;$('scaleY').value=v;$('scaleYV').textContent=v+'%';update(active);}
+    else if(kind==='rotate'){let v=Math.round(active.rotate||0)+dir;v=Math.max(-180,Math.min(180,v));active.rotate=v;$('rotate').value=v;$('rotateV').textContent=v+'°';update(active);}
+  }
+  document.querySelectorAll('.step-btn').forEach(btn=>{
+    const kind=btn.dataset.step;const dir=parseInt(btn.dataset.dir,10)||1;
+    const start=e=>{e.preventDefault();e.stopPropagation();if(btn.disabled||!active)return;stop();applyStep(kind,dir);holdT=setTimeout(()=>{holdT=null;repT=setInterval(()=>applyStep(kind,dir),50);},400);try{btn.setPointerCapture(e.pointerId);}catch(_){}};
+    btn.addEventListener('pointerdown', start);
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointercancel', stop);
+    btn.addEventListener('pointerleave', e=>{if(e.buttons===0)stop();});
+  });
+  window.addEventListener('pointerup', stop);window.addEventListener('pointercancel', stop);window.addEventListener('blur', stop);
+})();
+$('opacity').oninput=e=>{if(active){active.opacity=e.target.value/100;$('opacityV').textContent=e.target.value+'%';update(active)}};
+$('flip').onclick=()=>{if(active){active.flip=!active.flip;update(active)}};
+$('lock').onclick=()=>{if(active){active.locked=!active.locked;update(active);sync(active);tabs()}};
+$('clone').onclick=()=>{if(active){let c={...active,x:active.x+15,y:active.y+15,bg:false,locked:false};delete c.el;addLayer(active.src,false,c)}};
+function reorder(){layers.forEach(l=>stage.appendChild(l.el));const vl=$('mainVLine');const hl=$('mainHLine');if(vl)stage.appendChild(vl);if(hl)stage.appendChild(hl);tabs();}
+$('top').onclick=()=>{if(active){let i=layers.indexOf(active);if(i<layers.length-1){layers.splice(i,1);layers.push(active);reorder()}}};
+$('bottom').onclick=()=>{if(active){let i=layers.indexOf(active);if(i>0){layers.splice(i,1);layers.unshift(active);reorder()}}};
+$('up').onclick=()=>{if(active){let i=layers.indexOf(active);if(i<layers.length-1){[layers[i],layers[i+1]]=[layers[i+1],layers[i]];reorder()}}};
+$('down').onclick=()=>{if(active){let i=layers.indexOf(active);if(i>0){[layers[i],layers[i-1]]=[layers[i-1],layers[i]];reorder()}}};
+$('del').onclick=()=>{if(active){active.el.remove();layers=layers.filter(x=>x!==active);setActive(layers.at(-1)||null);if(!layers.length){placeholder.style.display='flex';$('export').disabled=true}}};
+
+[['bright','brightV','bright'],['contrast','contrastV','contrast'],['saturate','saturateV','saturate'],['hue','hueV','hue']].forEach(a=>$(a[0]).oninput=e=>{if(active){active[a[2]]=+e.target.value;$(a[1]).textContent=e.target.value+(a[2]=='hue'?'°':'');update(active)}});
+$('resetColor').onclick=()=>{if(active){active.bright=active.contrast=active.saturate=active.hue=0;sync(active);update(active)}};
+[['shadowBlur','shadowBlurV','shadowBlur','px'],['shadowX','shadowXV','shadowX','px'],['shadowY','shadowYV','shadowY','px']].forEach(a=>$(a[0]).oninput=e=>{if(active){active[a[2]]=+e.target.value;$(a[1]).textContent=e.target.value+a[3];update(active)}});
+$('shadowColor').oninput=e=>{if(active){active.shadowColor=e.target.value;update(active)}};
+$('resetShadow').onclick=()=>{if(active){active.shadowBlur=active.shadowX=active.shadowY=0;active.shadowColor='#000000';sync(active);update(active)}};
+document.querySelectorAll('.sub button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.sub button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');const panel=$(b.dataset.tab);if(panel)panel.classList.add('active');
+});
+stage.addEventListener('click',e=>{if(e.target===stage)setActive(null)});
+
+/* ========== 肤色基础工具 ========== */
+window.__refSkin=null;
+window.__skinPicking=false;
+function rgbToHex(r,g,b){return '#'+[r,g,b].map(v=>('0'+Math.max(0,Math.min(255,v|0)).toString(16)).slice(-2)).join('');}
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h=0,s=0,l=(max+min)/2;
+  if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;default:h=((r-g)/d+4)/6;break;}}
+  return {h:h*360,s:s*100,l:l*100};
+}
+function hslToRgb(h,s,l){
+  h=((h%360)+360)%360/360;s=Math.max(0,Math.min(100,s))/100;l=Math.max(0,Math.min(100,l))/100;
+  if(s===0){const v=Math.round(l*255);return {r:v,g:v,b:v};}
+  const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};
+  return {r:Math.round(hue2rgb(p,q,h+1/3)*255),g:Math.round(hue2rgb(p,q,h)*255),b:Math.round(hue2rgb(p,q,h-1/3)*255)};
+}
+function setRefSkin(r,g,b){
+  window.__refSkin={r,g,b};
+  const hex=rgbToHex(r,g,b);
+  const sw=$('skinSwatch'),hx=$('skinHex'),cp=$('copySkinHex');
+  if(sw)sw.style.background=hex;
+  if(hx){hx.textContent=hex;hx.style.color='#fff';}
+  if(cp){cp.disabled=false;cp.dataset.hex=hex;}
+  $('skinPaintBtn').disabled=!active;
+}
+function sampleStagePixel(clientX,clientY){
+  const rect=stage.getBoundingClientRect();
+  const x=clientX-rect.left,y=clientY-rect.top;
+  const sw=Math.max(1,stage.clientWidth||1),sh=Math.max(1,stage.clientHeight||1);
+  if(x<0||y<0||x>sw||y>sh)return null;
+  const c=document.createElement('canvas');c.width=sw;c.height=sh;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  layers.forEach(l=>{
+    if(!l.el||!l.el.complete)return;
+    const lsx=l.scaleX!=null?l.scaleX:(l.scale||1);
+    const lsy=l.scaleY!=null?l.scaleY:(l.scale||1);
+    const dw=l.nw*lsx,dh=l.nh*lsy;
+    const cx=sw/2+(l.x||0),cy=sh/2+(l.y||0);
+    ctx.save();ctx.globalAlpha=l.opacity!=null?l.opacity:1;
+    try{ctx.filter=filter(l,false);}catch(_){ctx.filter='none';}
+    ctx.translate(cx,cy);ctx.rotate((l.rotate||0)*Math.PI/180);
+    if(l.flip)ctx.scale(-1,1);
+    try{ctx.drawImage(l.el,-dw/2,-dh/2,dw,dh);}catch(_){}
+    ctx.restore();
+  });
+  const ix=Math.max(0,Math.min(sw-1,Math.round(x)));
+  const iy=Math.max(0,Math.min(sh-1,Math.round(y)));
+  const rad=2;
+  let sr=0,sg=0,sb=0,n=0;
+  try{
+    const data=ctx.getImageData(Math.max(0,ix-rad),Math.max(0,iy-rad),Math.min(sw,ix+rad+1)-Math.max(0,ix-rad),Math.min(sh,iy+rad+1)-Math.max(0,iy-rad)).data;
+    for(let i=0;i<data.length;i+=4){if(data[i+3]<50)continue;sr+=data[i];sg+=data[i+1];sb+=data[i+2];n++;}
+  }catch(_){return null;}
+  if(!n)return null;
+  return {r:Math.round(sr/n),g:Math.round(sg/n),b:Math.round(sb/n)};
+}
+$('pickSkin').onclick=()=>{
+  if(!layers.length){alert('请先添加图片');return;}
+  window.__skinPicking=true;
+  $('pickSkin').textContent='🎯 点击画布…';
+  $('pickSkin').classList.add('primary');
+  try{placeholder.style.display='none';}catch(_){}
+};
+stage.addEventListener('pointerdown',e=>{
+  if(!window.__skinPicking)return;
+  e.preventDefault();e.stopPropagation();
+  const p=e.touches?e.touches[0]:e;
+  const sample=sampleStagePixel(p.clientX,p.clientY);
+  window.__skinPicking=false;
+  $('pickSkin').textContent='🎯 画布取色';
+  $('pickSkin').classList.remove('primary');
+  if(!sample){alert('该位置几乎透明，请点在人物皮肤上');return;}
+  setRefSkin(sample.r,sample.g,sample.b);
+},{capture:true});
+
+$('copySkinHex').onclick=async ()=>{
+  const hex=($('copySkinHex').dataset.hex||($('skinHex')&&$('skinHex').textContent)||'').trim();
+  if(!hex||hex==='未选取'||!hex.startsWith('#')){alert('请先取色');return;}
+  const btn=$('copySkinHex');
+  const oldText=btn.textContent;
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(hex);
+    }else{
+      const ta=document.createElement('textarea');
+      ta.value=hex;ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+    }
+    btn.textContent='✅ 已复制';
+    setTimeout(()=>{btn.textContent=oldText||'📋 复制';},1200);
+  }catch(e){
+    alert('复制失败，请手动长按色值复制：'+hex);
+  }
+};
+
+/* ========== 复原肤色 ========== */
+function restoreLayerSkin(targetLayer){
+  if(!targetLayer){alert('请先选中图层');return;}
+  if(targetLayer.locked){alert('图层已锁定，请先解锁');return;}
+  const base=targetLayer.trueOriginalSrc||targetLayer.originalSrc||targetLayer.src;
+  if(!base){alert('没有可复原的原图');return;}
+  targetLayer.originalSrc=base;
+  targetLayer.bright=0;targetLayer.contrast=0;targetLayer.saturate=0;targetLayer.hue=0;
+  const finish=url=>{targetLayer.el.src=url;targetLayer.src=url;update(targetLayer);sync(targetLayer);};
+  if(targetLayer.maskDataUrl){
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const nw=img.naturalWidth,nh=img.naturalHeight;
+        const maxE=1200;const scale=Math.min(1,maxE/Math.max(nw,nh));
+        const cw=Math.max(1,Math.round(nw*scale)),ch=Math.max(1,Math.round(nh*scale));
+        const c=document.createElement('canvas');c.width=cw;c.height=ch;
+        const ctx=c.getContext('2d');ctx.drawImage(img,0,0,cw,ch);
+        const mi=new Image();
+        mi.onload=()=>{
+          try{
+            const mc=document.createElement('canvas');mc.width=cw;mc.height=ch;
+            mc.getContext('2d').drawImage(mi,0,0,cw,ch);
+            ctx.globalCompositeOperation='destination-in';ctx.drawImage(mc,0,0);
+            finish(c.toDataURL('image/png'));
+          }catch(_){finish(base);}
+        };
+        mi.onerror=()=>finish(base);mi.src=targetLayer.maskDataUrl;
+      }catch(_){finish(base);}
+    };
+    img.onerror=()=>finish(base);img.src=base;
+  } else finish(base);
+}
+$('restoreSkin').onclick=()=>restoreLayerSkin(active);
+
+/* ============================================================
+   ★ 智能换肤：优先 MediaPipe SelfieMulticlass（联网），失败自动回退离线
+   ============================================================ */
+(function(){
+  const OUT_MAX = 1400;
+
+  let mpSegmenter = null;
+  let mpLoadState = 'idle';
+  let mpLoadError = '';
+  let mpLoadPromise = null;
+
+  const MP_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
+  const MP_WASM_URL  = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm';
+
+  async function loadMediaPipe(onStatus){
+    if (mpLoadState === 'ready' && mpSegmenter) return true;
+    if (mpLoadPromise) return mpLoadPromise;
+
+    mpLoadState = 'loading';
+    if (onStatus) onStatus('<span style="color:var(--accent)">🌐 正在加载 AI 皮肤模型（需联网，约几秒）…</span>');
+
+    mpLoadPromise = (async () => {
+      const timeout = (ms, msg) => new Promise((_, rej) => setTimeout(() => rej(new Error(msg || '加载超时')), ms));
+      try {
+        if (onStatus) onStatus('<span style="color:var(--accent)">🌐 ① 加载 MediaPipe 运行时…</span>');
+        const visionModule = await Promise.race([
+          import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/+esm'),
+          timeout(15000, '运行时加载超时（请检查网络）')
+        ]);
+        const { FilesetResolver, ImageSegmenter } = visionModule;
+
+        if (onStatus) onStatus('<span style="color:var(--accent)">🌐 ② 初始化 WASM…</span>');
+        const vision = await Promise.race([
+          FilesetResolver.forVisionTasks(MP_WASM_URL),
+          timeout(18000, 'WASM 初始化超时')
+        ]);
+
+        if (onStatus) onStatus('<span style="color:var(--accent)">🌐 ③ 下载皮肤分割模型…</span>');
+        let segmenter = null;
+        try {
+          segmenter = await Promise.race([
+            ImageSegmenter.createFromOptions(vision, {
+              baseOptions: { modelAssetPath: MP_MODEL_URL, delegate: 'GPU' },
+              runningMode: 'IMAGE',
+              outputCategoryMask: true,
+              outputConfidenceMasks: false
+            }),
+            timeout(25000, '模型下载超时（网络较慢）')
+          ]);
+        } catch (gpuErr) {
+          console.warn('[MP] GPU 失败，尝试 CPU', gpuErr);
+          if (onStatus) onStatus('<span style="color:var(--accent)">🌐 GPU 不可用，改用 CPU…</span>');
+          segmenter = await Promise.race([
+            ImageSegmenter.createFromOptions(vision, {
+              baseOptions: { modelAssetPath: MP_MODEL_URL, delegate: 'CPU' },
+              runningMode: 'IMAGE',
+              outputCategoryMask: true,
+              outputConfidenceMasks: false
+            }),
+            timeout(30000, 'CPU 模型加载超时')
+          ]);
+        }
+
+        mpSegmenter = segmenter;
+        mpLoadState = 'ready';
+        mpLoadError = '';
+        if (onStatus) onStatus('<span style="color:#2dd4a8">✅ AI 模型加载成功，正在识别皮肤…</span>');
+        await new Promise(r => setTimeout(r, 400));
+        return true;
+      } catch (e) {
+        console.warn('[MP] 加载失败', e);
+        mpLoadState = 'failed';
+        mpLoadError = (e && e.message) ? e.message : '未知错误';
+        mpSegmenter = null;
+        if (onStatus) onStatus('<span style="color:var(--warning)">⚠️ AI 加载失败：' + mpLoadError + '<br>已自动切换离线模式</span>');
+        await new Promise(r => setTimeout(r, 1200));
+        return false;
+      } finally {
+        mpLoadPromise = null;
+      }
+    })();
+
+    return mpLoadPromise;
+  }
+
+  function segmentSkinWithMP(imgEl, tw, th){
+    return new Promise((resolve, reject) => {
+      if (!mpSegmenter) { reject(new Error('模型未就绪')); return; }
+      try {
+        const maxSide = 512;
+        const scale = Math.min(1, maxSide / Math.max(imgEl.naturalWidth || tw, imgEl.naturalHeight || th));
+        const sw = Math.max(1, Math.round((imgEl.naturalWidth || tw) * scale));
+        const sh = Math.max(1, Math.round((imgEl.naturalHeight || th) * scale));
+
+        const tmp = document.createElement('canvas');
+        tmp.width = sw; tmp.height = sh;
+        const tctx = tmp.getContext('2d');
+        tctx.drawImage(imgEl, 0, 0, sw, sh);
+
+        mpSegmenter.segment(tmp, (result) => {
+          try {
+            if (!result || !result.categoryMask) { reject(new Error('分割结果为空')); return; }
+            const maskData = result.categoryMask.getAsUint8Array();
+            const mw = result.categoryMask.width;
+            const mh = result.categoryMask.height;
+
+            const out = new Uint8Array(tw * th);
+            for (let y = 0; y < th; y++) {
+              const sy = Math.min(mh - 1, Math.floor(y * mh / th));
+              for (let x = 0; x < tw; x++) {
+                const sx = Math.min(mw - 1, Math.floor(x * mw / tw));
+                const cls = maskData[sy * mw + sx];
+                if (cls === 2 || cls === 3) out[y * tw + x] = 1;
+              }
+            }
+            const dilate = new Uint8Array(tw * th);
+            const R = 1;
+            for (let y = 0; y < th; y++) {
+              for (let x = 0; x < tw; x++) {
+                if (out[y * tw + x]) { dilate[y * tw + x] = 1; continue; }
+                let hit = false;
+                for (let dy = -R; dy <= R && !hit; dy++) {
+                  for (let dx = -R; dx <= R; dx++) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < tw && ny < th && out[ny * tw + nx]) { hit = true; break; }
+                  }
+                }
+                if (hit) dilate[y * tw + x] = 1;
+              }
+            }
+            let count = 0;
+            for (let i = 0; i < dilate.length; i++) if (dilate[i]) count++;
+            if (count < 30) { reject(new Error('AI 未检测到足够皮肤区域')); return; }
+            resolve({ mask: dilate, count, method: 'mediapipe' });
+          } catch (e) { reject(e); }
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function _segmentPersonOffline(imgEl, tw, th){
+    const c = document.createElement('canvas');
+    c.width = tw; c.height = th;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(imgEl, 0, 0, tw, th);
+    let data;
+    try { data = ctx.getImageData(0, 0, tw, th).data; }
+    catch (e) { throw new Error('无法读取像素'); }
+
+    const total = tw * th;
+    let opaque = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] >= 18) opaque++;
+    const isCutout = opaque / Math.max(1, total) < 0.93;
+
+    const mask = new Uint8Array(total);
+
+    if (isCutout) {
+      for (let p = 0; p < total; p++) { if (data[p * 4 + 3] >= 18) mask[p] = 1; }
+      return { mask, method: 'cutout' };
+    }
+
+    const skin = new Uint8Array(total);
+    let skinN = 0;
+    for (let p = 0, i = 0; p < total; p++, i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      if (a < 40) continue;
+      if (r < 45 || g < 25 || b < 12) continue;
+      if (r < g - 10 || r < b - 10) continue;
+      const maxc = Math.max(r, g, b), minc = Math.min(r, g, b);
+      if (maxc <= 0) continue;
+      const sat = (maxc - minc) / maxc;
+      if (sat < 0.025 || sat > 0.92) continue;
+      const yy = 0.299 * r + 0.587 * g + 0.114 * b;
+      const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+      const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+      if (yy < 30 || yy > 250) continue;
+      if (cb < 72 || cb > 132 || cr < 128 || cr > 185) continue;
+      skin[p] = 1;
+      skinN++;
+    }
+
+    if (skinN >= Math.max(40, total * 0.002)) {
+      const visited = new Uint8Array(total);
+      const qx = new Int32Array(total);
+      const qy = new Int32Array(total);
+      const components = [];
+      let bestArea = 0;
+      for (let sy = 0; sy < th; sy++) {
+        for (let sx = 0; sx < tw; sx++) {
+          const sp = sy * tw + sx;
+          if (!skin[sp] || visited[sp]) continue;
+          let head = 0, tail = 0;
+          qx[tail] = sx; qy[tail] = sy; tail++;
+          visited[sp] = 1;
+          const pixels = [];
+          let area = 0, minY = sy, maxY = sy, minX = sx, maxX = sx;
+          while (head < tail) {
+            const cx = qx[head], cy = qy[head]; head++;
+            pixels.push(cy * tw + cx);
+            area++;
+            if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+            if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
+            const nbs = [[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1],
+                         [cx - 1, cy - 1], [cx + 1, cy - 1], [cx - 1, cy + 1], [cx + 1, cy + 1]];
+            for (let n = 0; n < nbs.length; n++) {
+              const nx = nbs[n][0], ny = nbs[n][1];
+              if (nx < 0 || ny < 0 || nx >= tw || ny >= th) continue;
+              const np = ny * tw + nx;
+              if (!skin[np] || visited[np]) continue;
+              visited[np] = 1;
+              qx[tail] = nx; qy[tail] = ny; tail++;
+            }
+          }
+          if (area > bestArea) bestArea = area;
+          components.push({ pixels, area, minY, maxY, minX, maxX });
+        }
+      }
+
+      const minKeep = Math.max(25, Math.min(bestArea * 0.06, total * 0.004));
+      const merged = new Uint8Array(total);
+      let kept = 0;
+      for (const comp of components) {
+        const isUpper = (comp.minY + comp.maxY) / 2 < th * 0.45;
+        const keep = comp.area >= minKeep ||
+          (isUpper && comp.area >= Math.max(20, bestArea * 0.03));
+        if (!keep) continue;
+        for (let i = 0; i < comp.pixels.length; i++) merged[comp.pixels[i]] = 1;
+        kept++;
+      }
+
+      if (kept > 0 && bestArea >= 30) {
+        const dilateR = Math.max(3, Math.round(Math.min(tw, th) * 0.018));
+        for (let y = 0; y < th; y++) {
+          for (let x = 0; x < tw; x++) {
+            if (merged[y * tw + x]) { mask[y * tw + x] = 1; continue; }
+            let hit = false;
+            const y0 = Math.max(0, y - dilateR), y1 = Math.min(th - 1, y + dilateR);
+            const x0 = Math.max(0, x - dilateR), x1 = Math.min(tw - 1, x + dilateR);
+            outer: for (let yy = y0; yy <= y1; yy++) {
+              for (let xx = x0; xx <= x1; xx++) {
+                if (merged[yy * tw + xx]) { hit = true; break outer; }
+              }
+            }
+            if (hit) mask[y * tw + x] = 1;
+          }
+        }
+        return { mask, method: 'skin' };
+      }
+    }
+
+    mask.fill(1);
+    return { mask, method: 'full' };
+  }
+
+  function _morph(src,w,h,r,erode){
+    if(r<=0)return src.slice();
+    const out=new Uint8Array(w*h);
+    for(let y=0;y<h;y++){
+      const y0=Math.max(0,y-r),y1=Math.min(h-1,y+r);
+      for(let x=0;x<w;x++){
+        const x0=Math.max(0,x-r),x1=Math.min(w-1,x+r);
+        let v=erode?1:0;
+        outer: for(let yy=y0;yy<=y1;yy++){
+          const row=yy*w;
+          for(let xx=x0;xx<=x1;xx++){
+            const s=src[row+xx];
+            if(erode&&!s){v=0;break outer;}
+            if(!erode&&s){v=1;break outer;}
+          }
+        }
+        out[y*w+x]=v;
+      }
+    }
+    return out;
+  }
+
+  function _detectSkinBySeeds(imgEl,personMask,w,h){
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(imgEl,0,0,w,h);
+    let data;
+    try{data=ctx.getImageData(0,0,w,h).data;}
+    catch(e){throw new Error('肤色检测无法读取像素');}
+
+    let shU=0,ssU=0,slU=0,nU=0;
+    let shL=0,ssL=0,slL=0,nL=0;
+    let shA=0,ssA=0,slA=0,nA=0;
+    const midY=Math.floor(h*0.42);
+
+    for(let i=0,p=0;i<data.length;i+=4,p++){
+      if(!personMask[p])continue;
+      if(data[i+3]<25)continue;
+      const r=data[i],g=data[i+1],b=data[i+2];
+      if(r<50||r>250||g<28||g>240||b<18||b>230)continue;
+      if(r<g-6||r<b-6)continue;
+      const max=Math.max(r,g,b),min=Math.min(r,g,b);
+      if(max<=0)continue;
+      const sat=(max-min)/max;
+      if(sat<0.03||sat>0.88)continue;
+      const yv=0.299*r+0.587*g+0.114*b;
+      const cb=128-0.168736*r-0.331264*g+0.5*b;
+      const cr=128+0.5*r-0.418688*g-0.081312*b;
+      if(yv<35||yv>248)continue;
+      if(cb<72||cb>132||cr<128||cr>185)continue;
+      const hsl=rgbToHsl(r,g,b);
+      if(hsl.h>58 && hsl.h<350)continue;
+      const yy=Math.floor(p/w);
+      if(yy<midY){shU+=hsl.h;ssU+=hsl.s;slU+=hsl.l;nU++;}
+      else{shL+=hsl.h;ssL+=hsl.s;slL+=hsl.l;nL++;}
+      shA+=hsl.h;ssA+=hsl.s;slA+=hsl.l;nA++;
+    }
+    if(nA<15)throw new Error('人物轮廓内未检测到明显肤色，请确认人物清晰可见');
+
+    const seeds=[];
+    if(nU>=8) seeds.push({h:shU/nU,s:ssU/nU,l:slU/nU});
+    if(nL>=8) seeds.push({h:shL/nL,s:ssL/nL,l:slL/nL});
+    if(!seeds.length) seeds.push({h:shA/nA,s:ssA/nA,l:slA/nA});
+    seeds.push({h:shA/nA,s:ssA/nA,l:slA/nA});
+
+    const seedH=shA/nA, seedS=ssA/nA, seedL=slA/nA;
+    const seedCount=nA;
+    const HUE_TOL=42;
+
+    const skinMask=new Uint8Array(w*h);
+    const skinWeight=new Float32Array(w*h);
+    let skinCount=0;
+
+    for(let i=0,p=0;i<data.length;i+=4,p++){
+      if(!personMask[p])continue;
+      if(data[i+3]<25)continue;
+      const hsl=rgbToHsl(data[i],data[i+1],data[i+2]);
+
+      if(hsl.s<2||hsl.s>92)continue;
+      if(hsl.l<5||hsl.l>98)continue;
+
+      let bestDh=999;
+      for(let s=0;s<seeds.length;s++){
+        let dh=Math.abs(hsl.h-seeds[s].h);
+        if(dh>180)dh=360-dh;
+        if(dh<bestDh)bestDh=dh;
+      }
+      if(bestDh>HUE_TOL)continue;
+
+      let ww=1-(bestDh/HUE_TOL);
+      if(ww<0.12)continue;
+
+      if(hsl.l>92)ww*=0.7;
+      if(hsl.l<12)ww*=0.7;
+
+      skinMask[p]=1;
+      skinWeight[p]=ww;
+      skinCount++;
+    }
+    if(skinCount<30)throw new Error('人物轮廓内皮肤区域过小');
+
+    let m=_morph(skinMask,w,h,1,true);
+    m=_morph(m,w,h,2,false);
+    for(let p=0;p<w*h;p++){
+      if(!m[p]){skinMask[p]=0;skinWeight[p]=0;}
+      else if(!skinMask[p]){skinMask[p]=1;skinWeight[p]=Math.max(skinWeight[p],0.35);}
+    }
+
+    return { mask:skinMask, weight:skinWeight, count:skinCount, seedH,seedS,seedL, seedCount };
+  }
+
+  function _compositeWithMask(url,maskUrl){
+    return new Promise(resolve=>{
+      if(!maskUrl){resolve(url);return;}
+      const base=new Image();
+      base.onload=()=>{
+        const mi=new Image();
+        mi.onload=()=>{
+          try{
+            const cw=base.naturalWidth,ch=base.naturalHeight;
+            const c=document.createElement('canvas');c.width=cw;c.height=ch;
+            const x=c.getContext('2d');x.drawImage(base,0,0);
+            const mc=document.createElement('canvas');mc.width=cw;mc.height=ch;
+            mc.getContext('2d').drawImage(mi,0,0,cw,ch);
+            x.globalCompositeOperation='destination-in';x.drawImage(mc,0,0);
+            resolve(c.toDataURL('image/png'));
+          }catch(_){resolve(url);}
+        };
+        mi.onerror=()=>resolve(url);mi.src=maskUrl;
+      };
+      base.onerror=()=>resolve(url);base.src=url;
+    });
+  }
+
+  async function _lockAndReskin(imgEl,ref,strength,onStatus){
+    const nw=imgEl.naturalWidth||imgEl.width;
+    const nh=imgEl.naturalHeight||imgEl.height;
+    const oscale=Math.min(1,OUT_MAX/Math.max(nw,nh));
+    const ow=Math.max(1,Math.round(nw*oscale));
+    const oh=Math.max(1,Math.round(nh*oscale));
+
+    const base=document.createElement('canvas');base.width=ow;base.height=oh;
+    const bctx=base.getContext('2d',{willReadFrequently:true});
+    bctx.drawImage(imgEl,0,0,ow,oh);
+
+    let finalMask = null;
+    let finalWeight = null;
+    let segMethod = 'full';
+    let usedML = false;
+    let seedCount = 0;
+    let seedH = 30, seedS = 40, seedL = 55;
+
+    onStatus('<span style="color:var(--accent)">🌐 准备加载 AI 模型…</span>');
+    const mpOk = await loadMediaPipe(onStatus);
+    if (mpOk) {
+      try {
+        onStatus('<span style="color:var(--accent)">🤖 AI 正在识别皮肤区域…</span>');
+        const mpResult = await segmentSkinWithMP(imgEl, ow, oh);
+        finalMask = mpResult.mask;
+        finalWeight = new Float32Array(ow * oh);
+        for (let i = 0; i < finalMask.length; i++) {
+          if (finalMask[i]) finalWeight[i] = 0.92;
+        }
+        segMethod = 'mediapipe';
+        usedML = true;
+        seedCount = mpResult.count;
+        {
+          const sc = document.createElement('canvas');
+          sc.width = ow; sc.height = oh;
+          const sctx = sc.getContext('2d', { willReadFrequently: true });
+          sctx.drawImage(imgEl, 0, 0, ow, oh);
+          let sdata;
+          try { sdata = sctx.getImageData(0, 0, ow, oh).data; } catch (_) { sdata = null; }
+          let sh = 0, ss = 0, sl = 0, sn = 0;
+          if (sdata) {
+            for (let p = 0, i = 0; p < finalMask.length; p++, i += 4) {
+              if (!finalMask[p] || sdata[i + 3] < 30) continue;
+              const hsl = rgbToHsl(sdata[i], sdata[i + 1], sdata[i + 2]);
+              if (hsl.s < 3 || hsl.l < 8 || hsl.l > 96) continue;
+              sh += hsl.h; ss += hsl.s; sl += hsl.l; sn++;
+            }
+          }
+          if (sn >= 10) { seedH = sh / sn; seedS = ss / sn; seedL = sl / sn; }
+          else { seedH = 25; seedS = 35; seedL = 55; }
+        }
+      } catch (mpErr) {
+        console.warn('[MP] 分割失败，回退离线', mpErr);
+        if (onStatus) onStatus('<span style="color:var(--warning)">⚠️ AI 分割失败：' + ((mpErr && mpErr.message) || '未知') + '，切换离线…</span>');
+        await new Promise(r => setTimeout(r, 800));
+      }
+    } else {
+      if (onStatus) onStatus('<span style="color:var(--muted)">➡️ 使用离线肤色识别…</span>');
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (!finalMask) {
+      onStatus('正在识别人物轮廓（离线）…');
+      let personMask;
+      try {
+        const seg = _segmentPersonOffline(imgEl, ow, oh);
+        personMask = seg.mask;
+        segMethod = seg.method;
+        usedML = segMethod === 'cutout' || segMethod === 'skin';
+      } catch (e) {
+        console.warn('[轮廓识别失败] 回退全图', e);
+        personMask = new Uint8Array(ow * oh).fill(1);
+        segMethod = 'full';
+        usedML = false;
+      }
+
+      onStatus('正在识别皮肤区域（种子色相生长）…');
+      const skin = _detectSkinBySeeds(imgEl, personMask, ow, oh);
+      finalMask = skin.mask;
+      finalWeight = skin.weight;
+      seedCount = skin.seedCount;
+      seedH = skin.seedH; seedS = skin.seedS; seedL = skin.seedL;
+    }
+
+    let changed = 0;
+    for (let i = 0; i < finalMask.length; i++) if (finalMask[i]) changed++;
+    if (changed < 30) throw new Error('人物轮廓内皮肤像素过少，无法换肤');
+
+    const idata = bctx.getImageData(0, 0, ow, oh);
+    const d = idata.data;
+    const edgeFactor = new Float32Array(ow * oh);
+    for (let y = 1; y < oh - 1; y++) {
+      const row = y * ow;
+      for (let x = 1; x < ow - 1; x++) {
+        const p = row + x;
+        if (!finalMask[p]) continue;
+        const i = p * 4;
+        const iL = (p - 1) * 4, iR = (p + 1) * 4, iU = (p - ow) * 4, iD = (p + ow) * 4;
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const lumL = 0.299 * d[iL] + 0.587 * d[iL + 1] + 0.114 * d[iL + 2];
+        const lumR = 0.299 * d[iR] + 0.587 * d[iR + 1] + 0.114 * d[iR + 2];
+        const lumU = 0.299 * d[iU] + 0.587 * d[iU + 1] + 0.114 * d[iU + 2];
+        const lumD = 0.299 * d[iD] + 0.587 * d[iD + 1] + 0.114 * d[iD + 2];
+        const gx = Math.abs(lumL - lumR);
+        const gy = Math.abs(lumU - lumD);
+        const gmag = Math.sqrt(gx * gx + gy * gy);
+        edgeFactor[p] = Math.max(0.35, 1 - Math.min(1, gmag / 70));
+      }
+    }
+
+    const refHsl = rgbToHsl(ref.r, ref.g, ref.b);
+    let dh = refHsl.h - seedH;
+    if (dh > 180) dh -= 360; if (dh < -180) dh += 360;
+
+    const sRatio = refHsl.s / Math.max(12, seedS);
+    const lRatio = refHsl.l / Math.max(12, seedL);
+
+    let actuallyChanged = 0;
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      if (!finalMask[p]) continue;
+      const w = finalWeight[p] * edgeFactor[p] * strength;
+      if (w < 0.05) continue;
+      actuallyChanged++;
+
+      const hsl = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+      const nh2 = hsl.h + dh * w;
+
+      let targetS = hsl.s * sRatio;
+      if (targetS > 85) targetS = 85 + (targetS - 85) * 0.3;
+      if (targetS < 5) targetS = 5;
+      const ns = hsl.s + (targetS - hsl.s) * w * 0.85;
+
+      let targetL = hsl.l * lRatio;
+      if (hsl.l > 82) {
+        targetL = 82 + (hsl.l - 82) * 0.55 + (Math.min(96, targetL) - 82) * 0.4;
+      }
+      if (hsl.l < 18) {
+        targetL = 18 - (18 - hsl.l) * 0.55 - (18 - Math.max(5, targetL)) * 0.4;
+      }
+      targetL = Math.max(5, Math.min(97, targetL));
+      const nl = hsl.l + (targetL - hsl.l) * w * 0.7;
+
+      const rgb = hslToRgb(nh2, ns, nl);
+      d[i]     = Math.round(d[i]     + (rgb.r - d[i])     * w);
+      d[i + 1] = Math.round(d[i + 1] + (rgb.g - d[i + 1]) * w);
+      d[i + 2] = Math.round(d[i + 2] + (rgb.b - d[i + 2]) * w);
+    }
+    bctx.putImageData(idata, 0, 0);
+
+    return {
+      url: base.toDataURL('image/png'),
+      stats: { usedML, segMethod, changedPixels: actuallyChanged, totalPixels: ow * oh, seedCount }
+    };
+  }
+
+  $('skinPaintBtn').onclick = async function(){
+    if (!active) { alert('请先选中要换肤的图层'); return; }
+    if (!window.__refSkin) { alert('请先点「画布取色」吸取目标肤色'); return; }
+    if (active.locked) { alert('图层已锁定，请先解锁'); return; }
+
+    const strength = (+$('skinStrength').value || 85) / 100;
+    const btn = this;
+    const oldText = btn.textContent;
+    btn.disabled = true; btn.textContent = '⏳ 处理中…';
+
+    const statusEl = $('skinLockStatus');
+    const setStatus = msg => {
+      if (!statusEl) return;
+      if (!msg) { statusEl.style.display = 'none'; statusEl.textContent = ''; return; }
+      statusEl.style.display = ''; statusEl.innerHTML = msg;
+    };
+
+    try {
+      if (!active.trueOriginalSrc) {
+        active.trueOriginalSrc = active.originalSrc || active.src || (active.el && active.el.src);
+      }
+      const rawSrc = active.trueOriginalSrc;
+      if (!rawSrc) throw new Error('图层没有可用图片');
+
+      setStatus('<span style="color:var(--accent)">正在准备图片…</span>');
+
+      const img = await new Promise((res, rej) => {
+        const im = new Image(); im.crossOrigin = 'anonymous';
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error('图片加载失败'));
+        im.src = rawSrc;
+      });
+
+      await new Promise(r => setTimeout(r, 20));
+
+      const { url, stats } = await _lockAndReskin(img, window.__refSkin, strength, setStatus);
+      const finalUrl = await _compositeWithMask(url, active.maskDataUrl);
+
+      active.originalSrc = url;
+      active.el.src = finalUrl;
+      active.src = finalUrl;
+      active.bright = 0; active.contrast = 0; active.saturate = 0; active.hue = 0;
+      update(active); sync(active);
+
+      const methodMap = { mediapipe: '🟢 AI 皮肤分割', cutout: '🟢 抠图轮廓', skin: '🟢 肤色轮廓', full: '🟡 全图模式' };
+      const mode = methodMap[stats.segMethod] || (stats.usedML ? '🟢 轮廓锁定' : '🟡 基础模式');
+      const pct = (stats.changedPixels / stats.totalPixels * 100).toFixed(2);
+      setStatus(mode + ' · 皮肤像素 ' + stats.changedPixels + '（' + pct + '%）· 强度 ' + Math.round(strength * 100) + '%');
+      setTimeout(() => setStatus(''), 8000);
+    } catch (e) {
+      console.warn('lockAndReskin failed', e);
+      setStatus('❌ ' + (e && e.message ? e.message : '换肤失败'));
+      setTimeout(() => setStatus(''), 8000);
+    } finally {
+      btn.textContent = oldText || '🤖 AI 锁定换肤';
+      btn.disabled = false;
+    }
+  };
+
+  $('skinStrength').oninput = e => { $('skinStrengthV').textContent = e.target.value + '%'; };
+})();
+
+/* ========== 擦除模块 ========== */
+const eo=$('eraseOverlay'),eb=$('eraseBox'),cc=document.createElement('canvas'),ctx=cc.getContext('2d'),mask=document.createElement('canvas'),mctx=mask.getContext('2d');
+cc.id='editCanvas';
+cc.style.webkitTouchCallout='none';cc.style.webkitUserSelect='none';cc.style.userSelect='none';
+cc.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();return false;},{passive:false});
+cc.addEventListener('dragstart',e=>{e.preventDefault();return false;},{passive:false});
+
+let edit=null,imgEdit=null,mode='erase',drawing=false,last=null,hist=[];
+/* ★ AI 扫描结果：人物蒙版（Float32Array，1=人物，0=背景），用于约束手动笔刷 */
+let aiPersonMask=null;
+/* ★ 区域分割：横切线 + 开关。开时：线以下只擦背景人物；线以上只擦贴图人物 */
+let regionSplitOn=false;
+let eraseSplitYRatio=0.5; /* 相对 eraseBox 高度的 0~1 */
+/* 将粉线在盒子中的视觉位置精确映射到蒙版像素行 */
+function splitLineToMaskY(){
+  const W=mask.width||0, H=mask.height||0;
+  if(!H||!eb||!cc) return Math.round(eraseSplitYRatio*H);
+  try{
+    const boxR=eb.getBoundingClientRect();
+    const canR=cc.getBoundingClientRect();
+    if(boxR.height<2||canR.height<2) return Math.round(eraseSplitYRatio*H);
+    const lineY=eraseSplitYRatio*boxR.height; // 相对 box 顶
+    const canvasTop=canR.top-boxR.top;
+    let rel=(lineY-canvasTop)/canR.height; // 相对 canvas 显示区域 0~1
+    // 若有旋转，近似用包围盒（精确旋转映射复杂，无旋转时完全准确）
+    if(edit&&edit.rotate){
+      const rad=((edit.rotate%360)+360)%360;
+      // 小角度仍用线性；大角度时回退到比例
+      if(rad>8&&rad<352){ /* keep rel as-is on bounding box */ }
+    }
+    if(edit&&edit.flip){ /* 水平翻转不影响 Y */ }
+    rel=Math.max(0,Math.min(1,rel));
+    return Math.round(rel*H);
+  }catch(_){
+    return Math.round(eraseSplitYRatio*H);
+  }
+}
+
+const MAX_ERASE_EDGE=1600;let eraseZoom=1,erasePanX=0,erasePanY=0;let eraseScaleToOrig=1;
+const MAX_ERASE_HIST=5;
+function freeEraseHist(){hist.forEach(c=>{try{c.width=0;c.height=0;}catch(_){}});hist=[];}
+function safeHistSave(){
+  try{
+    if(!mask.width||!mask.height)return;
+    while(hist.length>=MAX_ERASE_HIST){const old=hist.shift();try{old.width=0;old.height=0;}catch(_){}}
+    const c=document.createElement('canvas');c.width=mask.width;c.height=mask.height;
+    c.getContext('2d').drawImage(mask,0,0);hist.push(c);
+  }catch(err){console.warn('histSave failed',err);freeEraseHist();try{const c=document.createElement('canvas');c.width=mask.width;c.height=mask.height;c.getContext('2d').drawImage(mask,0,0);hist.push(c);}catch(_){}}
+}
+function fsTransform(){
+  if(!edit||!cc.width)return;
+  const boxW=Math.max(eb.clientWidth||0,280),boxH=Math.max(eb.clientHeight||0,320);
+  const dw=cc.width,dh=cc.height;
+  const rad=Math.abs((edit.rotate%180)*Math.PI/180);
+  const bw=Math.abs(dw*Math.cos(rad))+Math.abs(dh*Math.sin(rad))||dw;
+  const bh=Math.abs(dw*Math.sin(rad))+Math.abs(dh*Math.cos(rad))||dh;
+  const fit=Math.min(boxW/bw,boxH/bh)*0.99;
+  const dispW=Math.max(1,dw*fit),dispH=Math.max(1,dh*fit);
+  const z=eraseZoom;erasePanX=0;erasePanY=0;
+  cc.style.width=dispW+'px';cc.style.height=dispH+'px';
+  cc.style.maxWidth='none';cc.style.maxHeight='none';
+  cc.style.transform=`translate(-50%,-50%) scale(${z}) rotate(${edit.rotate}deg) scale(${edit.flip?-1:1},1)`;
+  const esx=edit.scaleX!=null?edit.scaleX:(edit.scale||1);
+  const esy=edit.scaleY!=null?edit.scaleY:(edit.scale||1);
+  const stageW=Math.max(edit.nw*esx,1),stageH=Math.max(edit.nh*esy,1);
+  const kX=dispW/stageW,kY=dispH/stageH;
+  eb.querySelectorAll('.ref').forEach(im=>{
+    const relX=(+im.dataset.relX||0)*kX,relY=(+im.dataset.relY||0)*kY;
+    const refScaleX=(+im.dataset.scaleX||+im.dataset.scale||1)*kX;
+    const refScaleY=(+im.dataset.scaleY||+im.dataset.scale||1)*kY;
+    const flip=im.dataset.flip==='1'?-1:1;
+    im.style.width=(+im.dataset.nw||0)+'px';im.style.height=(+im.dataset.nh||0)+'px';
+    im.style.transform=`translate(calc(-50% + ${relX*z}px),calc(-50% + ${relY*z}px)) scale(${z}) rotate(${im.dataset.rotate||0}deg) scale(${refScaleX*flip},${refScaleY})`;
+  });
+  const zr=$('eraseZoomReset');if(zr)zr.textContent=z.toFixed(1)+'x';
+}
+function scheduleFsTransform(){requestAnimationFrame(()=>{fsTransform();requestAnimationFrame(fsTransform);setTimeout(fsTransform,80);setTimeout(fsTransform,200);});}
+function render(){if(!imgEdit||!cc.width)return;ctx.clearRect(0,0,cc.width,cc.height);try{ctx.drawImage(imgEdit,0,0,imgEdit.naturalWidth||cc.width,imgEdit.naturalHeight||cc.height,0,0,cc.width,cc.height);}catch(_){try{ctx.drawImage(imgEdit,0,0);}catch(__){}}ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,0,0);ctx.globalCompositeOperation='source-over';}
+function ep(e){let r=cc.getBoundingClientRect(),p=e.touches?e.touches[0]:e,nx=p.clientX-r.left,ny=p.clientY-r.top;let rad=-edit.rotate*Math.PI/180,rx=(nx-r.width/2)*Math.cos(rad)-(ny-r.height/2)*Math.sin(rad)+r.width/2,ry=(nx-r.width/2)*Math.sin(rad)+(ny-r.height/2)*Math.cos(rad)+r.height/2;let x=rx*cc.width/r.width,y=ry*cc.height/r.height;if(edit.flip)x=cc.width-x;return{x,y}}
+function histSave(){safeHistSave()}
+function brushPx(){const r=cc.getBoundingClientRect();return +$('brush').value*(cc.width/Math.max(r.width,1));}
+
+/* ============================================================
+   ★ 手动笔刷核心：像素级绘制 + AI 约束
+   - 背景图层：只允许在人物区域擦除（aiPersonMask=1）
+   - 贴图图层：只允许在背景区域擦除（aiPersonMask=0）
+   未扫描时无约束，行为与原版一致
+   ============================================================ */
+function stampToData(d,bw,bh,ox,oy,cx,cy,r){
+  const W=mask.width, H=mask.height;
+  const featherPx=Math.max(1,r*0.25);
+  const hasAI=!!(aiPersonMask && aiPersonMask.length===W*H);
+  const isBg=!!edit.bg;
+  const useRegion=regionSplitOn && hasAI;
+  const splitPy=useRegion ? splitLineToMaskY() : -1;
+  const lx=Math.max(0,Math.floor(cx-r)-ox);
+  const rx=Math.min(bw-1,Math.ceil(cx+r)-ox);
+  const ty=Math.max(0,Math.floor(cy-r)-oy);
+  const by=Math.min(bh-1,Math.ceil(cy+r)-oy);
+  if(rx<lx||by<ty)return;
+  const inner=r-featherPx;
+  for(let y=ty;y<=by;y++){
+    const py=oy+y;
+    for(let x=lx;x<=rx;x++){
+      const px=ox+x;
+      const ddx=px+0.5-cx, ddy=py+0.5-cy;
+      const dist=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(dist>r)continue;
+      let ba=1;
+      if(dist>inner) ba=Math.max(0,1-(dist-inner)/featherPx);
+      if(ba<=0)continue;
+      let allowed=1;
+      if(hasAI){
+        const pa=aiPersonMask[py*W+px];
+        if(useRegion){
+          /* 区域分割开启：
+             - 线以下 (py >= split)：只允许擦【背景图层】的人物身体（不能擦背景）
+             - 线以上 (py <  split)：只允许擦【贴图图层】的人物身体
+             其他组合 allowed=0 */
+          if(py >= splitPy){
+            allowed = isBg ? pa : 0;
+          } else {
+            allowed = (!isBg) ? pa : 0;
+          }
+        } else {
+          /* 原逻辑：背景图层只擦人物；贴图图层只擦背景（保留人物） */
+          allowed = isBg ? pa : (1-pa);
+        }
+      }
+      const strength=ba*allowed;
+      if(strength<=0.005)continue;
+      const o=(y*bw+x)*4;
+      if(mode==='erase'){
+        d[o+3]=Math.round(d[o+3]*(1-strength));
+      }else{
+        d[o+3]=Math.round(d[o+3]+(255-d[o+3])*strength);
+      }
+      d[o]=255; d[o+1]=255; d[o+2]=255;
+    }
+  }
+}
+
+function applyBrushAt(cx,cy){
+  const bs=brushPx();
+  const r=bs/2;
+  const W=mask.width,H=mask.height;
+  const x0=Math.max(0,Math.floor(cx-r));
+  const x1=Math.min(W-1,Math.ceil(cx+r));
+  const y0=Math.max(0,Math.floor(cy-r));
+  const y1=Math.min(H-1,Math.ceil(cy+r));
+  if(x1<x0||y1<y0)return;
+  const w=x1-x0+1,h=y1-y0+1;
+  let id;
+  try{id=mctx.getImageData(x0,y0,w,h);}catch(_){return;}
+  stampToData(id.data,w,h,x0,y0,cx,cy,r);
+  mctx.putImageData(id,x0,y0);
+}
+
+function draw(p){
+  if(!last)return;
+  const bs=brushPx();
+  const r=bs/2;
+  const W=mask.width,H=mask.height;
+  const dx=p.x-last.x, dy=p.y-last.y;
+  const dist=Math.hypot(dx,dy);
+  const step=Math.max(1,bs*0.15);
+  const n=Math.max(1,Math.ceil(dist/step));
+  const minX=Math.max(0,Math.floor(Math.min(last.x,p.x)-r));
+  const maxX=Math.min(W-1,Math.ceil(Math.max(last.x,p.x)+r));
+  const minY=Math.max(0,Math.floor(Math.min(last.y,p.y)-r));
+  const maxY=Math.min(H-1,Math.ceil(Math.max(last.y,p.y)+r));
+  if(maxX<minX||maxY<minY){last=p;return;}
+  const w=maxX-minX+1,h=maxY-minY+1;
+  let id;
+  try{id=mctx.getImageData(minX,minY,w,h);}catch(_){last=p;return;}
+  const d=id.data;
+  for(let i=1;i<=n;i++){
+    const cx=last.x+dx*i/n;
+    const cy=last.y+dy*i/n;
+    stampToData(d,w,h,minX,minY,cx,cy,r);
+  }
+  mctx.putImageData(id,minX,minY);
+  last=p;
+  render();
+}
+
+$('erase').onclick=()=>{if(!active)return;edit=active;eo.style.display='flex';
+/* 保留横切线节点，只清参考图与画布 */
+const splitLineKeep=$('eraseSplitLine');
+eb.querySelectorAll('.ref,canvas#editCanvas').forEach(n=>n.remove());
+if(splitLineKeep && !splitLineKeep.parentNode) eb.appendChild(splitLineKeep);
+eraseZoom=1;erasePanX=0;erasePanY=0;
+aiPersonMask=null; /* 每次进入重置 AI 约束 */
+regionSplitOn=false;
+eraseSplitYRatio=0.5;
+$('eraseBright').value=100;$('eraseBrightV').textContent='100%';eb.style.filter='';
+$('refOpacity').value=55;$('refOpacityV').textContent='55%';
+try{
+  const hint=$('aiHint');
+  if(hint){
+    hint.innerHTML='① 先 AI 扫描人物 ② 开「区域分割」拖动横切线：<b style="color:#f87171">线以下</b>只擦背景人物 · <b style="color:#60a5fa">线以上</b>只擦贴图身体';
+    hint.style.color='var(--muted)';
+  }
+  const st=$('aiSmartStatus');if(st){st.style.display='none';st.innerHTML='';}
+  const ab=$('aiSmartErase');if(ab){ab.disabled=false;ab.textContent='🤖 AI 扫描';}
+  const tg=$('regionSplitToggle');
+  if(tg){
+    tg.disabled=true;
+    tg.textContent='📍 区域分割:关';
+    tg.classList.remove('primary');
+    tg.style.background='#ffffff12';
+    tg.style.borderColor='var(--border)';
+    tg.style.color='var(--muted)';
+  }
+  const ae=$('autoRegionErase');
+  if(ae){
+    ae.disabled=true;
+    ae.textContent='⚡ 自动擦除（按区域）';
+    ae.classList.remove('primary');
+    ae.style.background='#ffffff12';
+    ae.style.borderColor='var(--border)';
+    ae.style.color='var(--muted)';
+  }
+  const sl=$('eraseSplitLine');
+  if(sl){sl.style.display='none';sl.style.top='50%';sl.style.transform='translateY(-50%)';}
+}catch(_){}
+layers.forEach(l=>{
+  if(l===edit){eb.appendChild(cc);return;}
+  const im=document.createElement('img');im.className='ref';im.src=l.el.src;im.draggable=false;
+  im.style.webkitTouchCallout='none';im.style.webkitUserSelect='none';im.style.userSelect='none';
+  im.style.opacity=String((+$('refOpacity').value||55)/100);im.style.pointerEvents='none';
+  im.dataset.relX=String(l.x-edit.x);im.dataset.relY=String(l.y-edit.y);
+  im.dataset.nw=String(l.nw);im.dataset.nh=String(l.nh);
+  im.dataset.scaleX=String(l.scaleX!=null?l.scaleX:(l.scale||1));
+  im.dataset.scaleY=String(l.scaleY!=null?l.scaleY:(l.scale||1));
+  im.dataset.rotate=String(l.rotate);im.dataset.flip=l.flip?'1':'0';
+  im.addEventListener('contextmenu',e=>{e.preventDefault();return false;});
+  eb.appendChild(im);
+});
+/* 横切线始终在最上层 */
+const _sl=$('eraseSplitLine');if(_sl)eb.appendChild(_sl);
+imgEdit=new Image();
+imgEdit.onload=()=>{
+  try{
+    if(!imgEdit.naturalWidth||!imgEdit.naturalHeight){alert('图片无效');eo.style.display='none';return;}
+    const nw=imgEdit.naturalWidth,nh=imgEdit.naturalHeight;
+    const edge=Math.max(nw,nh);eraseScaleToOrig=edge>MAX_ERASE_EDGE?MAX_ERASE_EDGE/edge:1;
+    const ww=Math.max(1,Math.round(nw*eraseScaleToOrig)),hh=Math.max(1,Math.round(nh*eraseScaleToOrig));
+    cc.width=ww;cc.height=hh;mask.width=ww;mask.height=hh;
+    mctx.fillStyle='#fff';mctx.fillRect(0,0,mask.width,mask.height);
+    const finish=()=>{freeEraseHist();histSave();render();scheduleFsTransform();};
+    if(edit.maskDataUrl){const mi=new Image();mi.onload=()=>{try{mctx.drawImage(mi,0,0,mask.width,mask.height);}catch(_){}finish();};mi.onerror=finish;mi.src=edit.maskDataUrl;}
+    else finish();
+  }catch(err){console.warn('erase init failed',err);alert('擦除初始化失败');eo.style.display='none';}
+};
+imgEdit.onerror=()=>{alert('原图加载失败');eo.style.display='none';};
+if(!edit.originalSrc)edit.originalSrc=(edit.el&&edit.el.src)||edit.src;
+const openSrc=edit.originalSrc||(edit.el&&edit.el.src)||edit.src;
+if(!openSrc){alert('没有可用图片');eo.style.display='none';return;}
+imgEdit.src=openSrc;
+};
+
+$('eraseMode').onclick=()=>{mode='erase';$('eraseMode').className='btn primary';$('restoreMode').className='btn';$('wandMode').className='btn';$('brushPanel').style.display='flex';$('wandPanel').style.display='none'};
+$('restoreMode').onclick=()=>{mode='restore';$('restoreMode').className='btn primary';$('eraseMode').className='btn';$('wandMode').className='btn';$('brushPanel').style.display='flex';$('wandPanel').style.display='none'};
+$('wandMode').onclick=()=>{mode='wand';$('wandMode').className='btn primary';$('eraseMode').className='btn';$('restoreMode').className='btn';$('brushPanel').style.display='none';$('wandPanel').style.display='block'};
+$('brush').oninput=e=>$('brushV').textContent=e.target.value+'px';
+$('feather').oninput=e=>$('featherV').textContent=e.target.value+'px';
+$('tol').oninput=e=>$('tolV').textContent=e.target.value;
+$('eraseBright').oninput=e=>{$('eraseBrightV').textContent=e.target.value+'%';eb.style.filter=`brightness(${e.target.value}%)`;};
+$('refOpacity').oninput=e=>{$('refOpacityV').textContent=e.target.value+'%';const o=(+e.target.value)/100;eb.querySelectorAll('.ref').forEach(im=>{im.style.opacity=String(o);});};
+
+/* ============================================================
+   ★ AI 智能识别（只扫描，不自动擦除）
+   - 扫描出人物蒙版，存到 aiPersonMask
+   - 之后手动笔刷自动受蒙版约束
+   - 背景图层：只擦人物；贴图图层：只擦背景
+   ============================================================ */
+let __personSeg = null;
+let __personSegLoad = null;
+
+async function __getPersonSeg(){
+  if(__personSeg) return __personSeg;
+  if(__personSegLoad) return __personSegLoad;
+
+  __personSegLoad = (async () => {
+    const t = (ms, msg) => new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms));
+
+    const mod = await Promise.race([
+      import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/+esm'),
+      t(15000, '运行时加载超时，请检查网络')
+    ]);
+    const { FilesetResolver, ImageSegmenter } = mod;
+
+    const vision = await Promise.race([
+      FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'),
+      t(18000, 'WASM 初始化超时')
+    ]);
+
+    const modelUrl = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+    const opts = (delegate) => ({
+      baseOptions: { modelAssetPath: modelUrl, delegate },
+      runningMode: 'IMAGE',
+      outputConfidenceMasks: true,
+      outputCategoryMask: false
+    });
+
+    let seg;
+    try {
+      seg = await Promise.race([
+        ImageSegmenter.createFromOptions(vision, opts('GPU')),
+        t(25000, '模型加载超时')
+      ]);
+    } catch (e) {
+      console.warn('[PersonSeg] GPU 失败，尝试 CPU', e);
+      seg = await Promise.race([
+        ImageSegmenter.createFromOptions(vision, opts('CPU')),
+        t(30000, '模型加载超时（CPU）')
+      ]);
+    }
+
+    __personSeg = seg;
+    return seg;
+  })();
+
+  try {
+    return await __personSegLoad;
+  } finally {
+    __personSegLoad = null;
+  }
+}
+
+async function __computePersonAlpha(imgEl, tw, th){
+  const seg = await __getPersonSeg();
+
+  const nw = imgEl.naturalWidth || imgEl.width;
+  const nh = imgEl.naturalHeight || imgEl.height;
+  const MAX = 512;
+  const scale = Math.min(1, MAX / Math.max(nw, nh));
+  const sw = Math.max(1, Math.round(nw * scale));
+  const sh = Math.max(1, Math.round(nh * scale));
+
+  const tmp = document.createElement('canvas');
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext('2d').drawImage(imgEl, 0, 0, sw, sh);
+
+  const result = await new Promise((resolve, reject) => {
+    try {
+      seg.segment(tmp, (r) => resolve(r));
+    } catch (e) {
+      reject(e);
+    }
+  });
+
+  if (!result || !result.confidenceMasks || !result.confidenceMasks.length) {
+    if (result && result.close) result.close();
+    throw new Error('分割结果为空');
+  }
+
+  const cm = result.confidenceMasks[result.confidenceMasks.length - 1];
+  const mw = cm.width, mh = cm.height;
+  const src = cm.getAsFloat32Array();
+
+  // 双线性插值放大到目标尺寸
+  const out = new Float32Array(tw * th);
+  for (let y = 0; y < th; y++) {
+    const sy = (y + 0.5) * mh / th - 0.5;
+    let y0 = Math.floor(sy);
+    const fy = sy - y0;
+    y0 = Math.max(0, Math.min(mh - 1, y0));
+    const y1 = Math.min(mh - 1, y0 + 1);
+    for (let x = 0; x < tw; x++) {
+      const sx = (x + 0.5) * mw / tw - 0.5;
+      let x0 = Math.floor(sx);
+      const fx = sx - x0;
+      x0 = Math.max(0, Math.min(mw - 1, x0));
+      const x1 = Math.min(mw - 1, x0 + 1);
+      const v00 = src[y0 * mw + x0], v10 = src[y0 * mw + x1];
+      const v01 = src[y1 * mw + x0], v11 = src[y1 * mw + x1];
+      const v = (v00 * (1 - fx) + v10 * fx) * (1 - fy) +
+                (v01 * (1 - fx) + v11 * fx) * fy;
+      out[y * tw + x] = v;
+    }
+  }
+
+  if (result.close) result.close();
+  return out;
+}
+
+$('aiSmartErase').onclick = async function(){
+  if(!edit || !imgEdit || !imgEdit.complete || !cc.width || !mask.width){
+    alert('图片还没加载完，请稍候');
+    return;
+  }
+  if(edit.locked){
+    alert('图层已锁定，请先解锁');
+    return;
+  }
+  const btn = this;
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ 识别中…';
+
+  const statusEl = $('aiSmartStatus');
+  const setStatus = (msg, color) => {
+    if(!statusEl) return;
+    if(!msg){ statusEl.style.display='none'; statusEl.innerHTML=''; return; }
+    statusEl.style.display = '';
+    statusEl.innerHTML = color ? ('<span style="color:'+color+'">'+msg+'</span>') : msg;
+  };
+
+  const isBg = !!edit.bg;
+  try{
+    setStatus('🌐 首次使用需加载 AI 模型（约 5-15 秒）…', 'var(--accent)');
+    await new Promise(r => setTimeout(r, 40));
+
+    const personAlpha = await __computePersonAlpha(imgEdit, mask.width, mask.height);
+
+    // 统计
+    let count = 0;
+    for(let i = 0; i < personAlpha.length; i++) if(personAlpha[i] > 0.5) count++;
+    if(count < 50){
+      throw new Error('未检测到明显人物，请换张更清晰的图片');
+    }
+
+    // 存储蒙版，作为后续手动笔刷的约束
+    aiPersonMask = personAlpha;
+
+    const pct = (count / (mask.width * mask.height) * 100).toFixed(1);
+    setStatus(
+      '✅ 已扫描人物（占画面 ' + pct + '%）· 可开「区域分割」：线以下擦背景人物 · 线以上擦贴图身体',
+      '#2dd4a8'
+    );
+
+    // 扫描成功后允许开启区域分割
+    const tg = $('regionSplitToggle');
+    if(tg){ tg.disabled = false; }
+    const ae = $('autoRegionErase');
+    if(ae){ ae.disabled = false; }
+
+    btn.textContent = '✅ 已扫描';
+    setTimeout(() => {
+      btn.textContent = oldText || '🤖 AI 扫描';
+      btn.disabled = false;
+    }, 1200);
+  } catch(e){
+    console.warn('[aiSmartErase] failed', e);
+    setStatus('❌ ' + (e && e.message ? e.message : '识别失败'), 'var(--danger)');
+    btn.textContent = '❌ 失败';
+    setTimeout(() => {
+      btn.textContent = oldText || '🤖 AI 扫描';
+      btn.disabled = false;
+    }, 1500);
+  }
+};
+
+/* ========== 一键自动擦除（按区域 + AI 蒙版） ========== */
+$('autoRegionErase').onclick = function(){
+  if(!edit || !mask.width || !aiPersonMask || aiPersonMask.length !== mask.width * mask.height){
+    alert('请先点「AI 扫描」识别人物');
+    return;
+  }
+  if(edit.locked){ alert('图层已锁定，请先解锁'); return; }
+
+  const isBg = !!edit.bg;
+  const useSplit = regionSplitOn;
+  const W = mask.width, H = mask.height;
+  const splitPy = useSplit ? splitLineToMaskY() : -1;
+
+  histSave();
+
+  let id;
+  try{ id = mctx.getImageData(0, 0, W, H); }
+  catch(e){ alert('无法读取蒙版'); return; }
+  const d = id.data;
+  let erased = 0;
+
+  for(let py = 0; py < H; py++){
+    for(let px = 0; px < W; px++){
+      const p = py * W + px;
+      const pa = aiPersonMask[p];
+      if(pa < 0.35) continue; // 非人物跳过
+
+      let shouldErase = false;
+      if(useSplit){
+        // 区域分割开：线以下擦背景人物；线以上擦贴图人物
+        if(py >= splitPy){
+          shouldErase = isBg;   // 线以下 + 当前是背景图层
+        } else {
+          shouldErase = !isBg;  // 线以上 + 当前是贴图图层
+        }
+      } else {
+        // 未开区域分割：背景图层擦全部人物；贴图图层不自动擦人物（保留）
+        shouldErase = isBg;
+      }
+
+      if(!shouldErase) continue;
+
+      const o = p * 4;
+      // 按置信度软擦除，边缘更自然
+      const strength = Math.min(1, Math.max(0, (pa - 0.2) / 0.6));
+      if(strength < 0.05) continue;
+      d[o+3] = Math.round(d[o+3] * (1 - strength));
+      d[o] = 255; d[o+1] = 255; d[o+2] = 255;
+      erased++;
+    }
+  }
+
+  mctx.putImageData(id, 0, 0);
+  render();
+  histSave();
+
+  const st = $('aiSmartStatus');
+  if(st){
+    st.style.display = '';
+    const zone = useSplit
+      ? (isBg ? '线以下 · 背景人物' : '线以上 · 贴图人物')
+      : (isBg ? '全图 · 背景人物' : '未开区域分割，贴图不自动擦人物');
+    st.innerHTML = '<span style="color:#2dd4a8">⚡ 自动擦除完成</span> · ' + zone + ' · 约 ' + erased + ' 像素 · 可继续手动微调';
+  }
+};
+
+/* ========== 区域分割开关 + 横切线拖动 ========== */
+(function(){
+  const tg = $('regionSplitToggle');
+  const line = $('eraseSplitLine');
+  if(!tg || !line) return;
+
+  function syncLinePos(){
+    if(!eb) return;
+    const boxH = eb.clientHeight || 1;
+    const topPx = eraseSplitYRatio * boxH;
+    line.style.top = topPx + 'px';
+    line.style.transform = 'translateY(-50%)';
+  }
+
+  tg.onclick = () => {
+    if(!aiPersonMask){
+      alert('请先点「AI 扫描」识别人物');
+      return;
+    }
+    regionSplitOn = !regionSplitOn;
+    const ae = $('autoRegionErase');
+    if(regionSplitOn){
+      tg.textContent = '📍 区域分割:开';
+      tg.classList.add('primary');
+      tg.style.background = 'linear-gradient(135deg,#eb5e55,#f87171)';
+      tg.style.borderColor = '#eb5e55';
+      tg.style.color = '#fff';
+      line.style.display = 'block';
+      syncLinePos();
+      if(ae && aiPersonMask){
+        ae.disabled = false;
+        ae.classList.add('primary');
+        ae.style.background = 'linear-gradient(135deg,#f59e0b,#fbbf24)';
+        ae.style.borderColor = '#f59e0b';
+        ae.style.color = '#000';
+        ae.textContent = '⚡ 自动擦除（按区域）';
+      }
+      const st = $('aiSmartStatus');
+      if(st){
+        st.style.display = '';
+        st.innerHTML = '<span style="color:#f87171">区域分割已开</span> · 拖粉线定位 · 点「自动擦除」：线以下擦背景人物 · 线以上擦贴图身体 · 当前：' + (edit && edit.bg ? '背景' : '贴图');
+      }
+    } else {
+      tg.textContent = '📍 区域分割:关';
+      tg.classList.remove('primary');
+      tg.style.background = '#ffffff12';
+      tg.style.borderColor = 'var(--border)';
+      tg.style.color = 'var(--muted)';
+      line.style.display = 'none';
+      if(ae){
+        ae.classList.remove('primary');
+        ae.style.background = '#ffffff12';
+        ae.style.borderColor = 'var(--border)';
+        ae.style.color = 'var(--muted)';
+        ae.textContent = '⚡ 自动擦除（按区域）';
+      }
+      const st = $('aiSmartStatus');
+      if(st){
+        st.style.display = '';
+        st.innerHTML = '<span style="color:var(--muted)">区域分割已关 · 自动擦除仅作用于背景人物（全图）</span>';
+      }
+    }
+  };
+
+  let dragging = false, startY = 0, startRatio = 0.5;
+  const onDown = e => {
+    if(!regionSplitOn) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = e.touches ? e.touches[0] : e;
+    dragging = true;
+    window.__eraseSplitDrag = true;
+    startY = p.clientY;
+    startRatio = eraseSplitYRatio;
+    try{ line.setPointerCapture?.(e.pointerId); }catch(_){}
+  };
+  const onMove = e => {
+    if(!dragging) return;
+    e.preventDefault(); e.stopPropagation();
+    const p = e.touches ? e.touches[0] : e;
+    const boxH = eb.clientHeight || 1;
+    let nr = startRatio + (p.clientY - startY) / boxH;
+    nr = Math.max(0.08, Math.min(0.92, nr));
+    eraseSplitYRatio = nr;
+    syncLinePos();
+  };
+  const onUp = () => {
+    dragging = false;
+    window.__eraseSplitDrag = false;
+  };
+  line.addEventListener('pointerdown', onDown);
+  line.addEventListener('touchstart', onDown, {passive:false});
+  window.addEventListener('pointermove', onMove, {capture:true});
+  window.addEventListener('touchmove', onMove, {passive:false, capture:true});
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('touchend', onUp);
+
+  // 缩放后保持比例位置
+  const _origFs = fsTransform;
+  fsTransform = function(){
+    _origFs();
+    if(regionSplitOn) syncLinePos();
+  };
+})();
+
+let strokeActive=false;
+function restoreLastHist(){if(!hist.length)return;mctx.clearRect(0,0,mask.width,mask.height);mctx.drawImage(hist.at(-1),0,0);render();}
+function abortStroke(){if(drawing||strokeActive){drawing=false;strokeActive=false;last=null;restoreLastHist();}}
+eb.addEventListener('pointerdown',e=>{
+  if(e.target.classList.contains('ref'))return;
+  if(e.target.closest && e.target.closest('#eraseSplitLine'))return;
+  if(window.__eraseSplitDrag)return;
+  if(!edit)return;if(e.isPrimary===false)return;
+  if(window.__eraseTouches>=2)return;
+  e.preventDefault();eb.setPointerCapture?.(e.pointerId);
+  if(mode==='wand')return;
+  drawing=true;strokeActive=true;last=ep(e);
+  applyBrushAt(last.x,last.y);
+  render();
+});
+eb.addEventListener('pointermove',e=>{if(!drawing||!strokeActive)return;if(window.__eraseTouches>=2){abortStroke();return;}e.preventDefault();draw(ep(e));});
+eb.addEventListener('pointerup',e=>{if(drawing&&strokeActive){drawing=false;strokeActive=false;last=null;histSave();}else{drawing=false;strokeActive=false;last=null;}});
+eb.addEventListener('pointercancel',()=>abortStroke());
+$('undo').onclick=()=>{if(hist.length>1){hist.pop();mctx.clearRect(0,0,mask.width,mask.height);mctx.drawImage(hist.at(-1),0,0);render();}};
+$('resetMask').onclick=()=>{mctx.clearRect(0,0,mask.width,mask.height);mctx.fillStyle='#fff';mctx.fillRect(0,0,mask.width,mask.height);hist=[];histSave();render();};
+$('cancelErase').onclick=()=>{
+  eb.style.filter='';eraseZoom=1;erasePanX=0;erasePanY=0;
+  aiPersonMask=null;regionSplitOn=false;eraseSplitYRatio=0.5;
+  const sl=$('eraseSplitLine');if(sl)sl.style.display='none';
+  const tg=$('regionSplitToggle');
+  if(tg){tg.disabled=true;tg.textContent='📍 区域分割:关';tg.classList.remove('primary');tg.style.background='#ffffff12';tg.style.borderColor='var(--border)';tg.style.color='var(--muted)';}
+  const ae=$('autoRegionErase');
+  if(ae){ae.disabled=true;ae.textContent='⚡ 自动擦除（按区域）';ae.classList.remove('primary');ae.style.background='#ffffff12';ae.style.borderColor='var(--border)';ae.style.color='var(--muted)';}
+  freeEraseHist();eo.style.display='none';
+};
+$('eraseZoomIn').onclick=()=>{eraseZoom=Math.min(5,eraseZoom*1.25);fsTransform();};
+$('eraseZoomOut').onclick=()=>{eraseZoom=Math.max(0.5,eraseZoom/1.25);if(eraseZoom<=1.01){eraseZoom=1;erasePanX=0;erasePanY=0;}fsTransform();};
+$('eraseZoomReset').onclick=()=>{eraseZoom=1;erasePanX=0;erasePanY=0;fsTransform();};
+(function(){
+  let pinching=false,dist0=0,zoom0=1;window.__eraseTouches=0;
+  eb.addEventListener('touchstart',e=>{
+    if(!edit||eo.style.display==='none')return;
+    window.__eraseTouches=e.touches.length;
+    if(e.touches.length>=2){e.preventDefault();abortStroke();pinching=true;const a=e.touches[0],b=e.touches[1];dist0=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)||1;zoom0=eraseZoom;}
+  },{passive:false,capture:true});
+  eb.addEventListener('touchmove',e=>{
+    window.__eraseTouches=e.touches.length;
+    if(e.touches.length>=2){e.preventDefault();abortStroke();
+      if(!pinching){pinching=true;const a=e.touches[0],b=e.touches[1];dist0=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)||1;zoom0=eraseZoom;}
+      const a=e.touches[0],b=e.touches[1];const dist=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)||1;
+      eraseZoom=Math.max(0.5,Math.min(5,zoom0*(dist/dist0)));erasePanX=0;erasePanY=0;fsTransform();
+    }
+  },{passive:false,capture:true});
+  eb.addEventListener('touchend',e=>{window.__eraseTouches=e.touches.length;if(e.touches.length<2)pinching=false;},{capture:true});
+  eb.addEventListener('touchcancel',e=>{window.__eraseTouches=e.touches.length;pinching=false;abortStroke();},{capture:true});
+})();
+$('applyErase').onclick=()=>{
+  if(!edit||!imgEdit||!cc.width)return;
+  eraseZoom=1;erasePanX=0;erasePanY=0;
+  if(!edit.originalSrc)edit.originalSrc=edit.src||(edit.el&&edit.el.src);
+  const prevSrc=edit.src||(edit.el&&edit.el.src);
+  try{
+    let maskUrl=null;try{maskUrl=mask.toDataURL('image/png');}catch(_){maskUrl=null;}
+    const c=document.createElement('canvas');c.width=cc.width;c.height=cc.height;
+    const x=c.getContext('2d');
+    x.drawImage(imgEdit,0,0,imgEdit.naturalWidth||cc.width,imgEdit.naturalHeight||cc.height,0,0,cc.width,cc.height);
+    x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);
+    const u=c.toDataURL('image/png');
+    if(!u||u.length<32)throw new Error('empty dataURL');
+    const test=new Image();
+    test.onload=()=>{edit.el.src=u;edit.src=u;edit.maskDataUrl=maskUrl;edit.maskData=null;update(edit);sync(edit);freeEraseHist();eb.style.filter='';eo.style.display='none';};
+    test.onerror=()=>{if(prevSrc){edit.el.src=prevSrc;edit.src=prevSrc;}alert('应用失败');freeEraseHist();eb.style.filter='';eo.style.display='none';};
+    test.src=u;
+  }catch(err){console.warn('applyErase failed',err);if(prevSrc){try{edit.el.src=prevSrc;edit.src=prevSrc;}catch(_){}}alert('应用擦除失败');freeEraseHist();eo.style.display='none';}
+};
+
+/* ========== 导出 ========== */
+let fullCanvas=null,crop={x:0,y:0,w:0,h:0},dragCrop=false,handle=null,startX=0,startY=0,startCrop=null;
+const preview=$('preview'),previewWrap=$('previewWrap'),cropEl=$('crop');
+preview.style.webkitTouchCallout='none';preview.style.webkitUserSelect='none';preview.style.userSelect='none';preview.style.pointerEvents='none';
+preview.addEventListener('contextmenu',e=>{e.preventDefault();return false;});
+
+function renderExport(){
+ const OUT_W=1080,OUT_H=1920;
+ const sw=Math.max(1,stage.clientWidth||wrap.clientWidth||360);
+ const sh=Math.max(1,stage.clientHeight||wrap.clientHeight||640);
+ fullCanvas=document.createElement('canvas');fullCanvas.width=OUT_W;fullCanvas.height=OUT_H;
+ const c=fullCanvas.getContext('2d');
+ c.fillStyle='#000';c.fillRect(0,0,OUT_W,OUT_H);
+ const sx=OUT_W/sw,sy=OUT_H/sh;
+ layers.forEach(l=>{
+   if(!l||!l.el||!l.el.src)return;
+   const lsx=l.scaleX!=null?l.scaleX:(l.scale||1);
+   const lsy=l.scaleY!=null?l.scaleY:(l.scale||1);
+   const img=l.el,dw=l.nw*lsx*sx,dh=l.nh*lsy*sy,cx=OUT_W/2+(l.x||0)*sx,cy=OUT_H/2+(l.y||0)*sy;
+   c.save();
+   c.globalAlpha=l.opacity!=null?l.opacity:1;
+   try{c.filter=filter(l,false);}catch(_){c.filter='none';}
+   if(l.shadowBlur>0){c.shadowColor=l.shadowColor||'#000';c.shadowBlur=l.shadowBlur*sx;c.shadowOffsetX=(l.shadowX||0)*sx;c.shadowOffsetY=(l.shadowY||0)*sy}
+   c.translate(cx,cy);c.rotate(((l.rotate||0)*Math.PI)/180);if(l.flip)c.scale(-1,1);
+   try{c.drawImage(img,-dw/2,-dh/2,dw,dh);}catch(err){console.warn('draw layer failed',err);}
+   c.restore();
+ });
+ preview.width=OUT_W;preview.height=OUT_H;
+ try{preview.getContext('2d').drawImage(fullCanvas,0,0);}catch(_){}
+ $('save').style.display='flex';
+ setTimeout(()=>initCrop(),50);
+ setTimeout(()=>initCrop(),200);
+}
+function initCrop(){
+ const w=preview.clientWidth,h=preview.clientHeight;
+ let cw=w,ch=cw*16/9;if(ch>h){ch=h;cw=ch*9/16}
+ crop={x:(w-cw)/2,y:(h-ch)/2,w:cw,h:ch};cropDOM();
+}
+function cropDOM(){cropEl.style.left=crop.x+'px';cropEl.style.top=crop.y+'px';cropEl.style.width=crop.w+'px';cropEl.style.height=crop.h+'px'}
+cropEl.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();dragCrop=true;handle=e.target.dataset.h||'box';startX=e.clientX;startY=e.clientY;startCrop={...crop};cropEl.setPointerCapture?.(e.pointerId)});
+cropEl.addEventListener('pointermove',e=>{if(!dragCrop)return;e.preventDefault();let dx=e.clientX-startX,dy=e.clientY-startY,W=preview.clientWidth,H=preview.clientHeight,ratio=9/16;
+ if(handle==='box'){crop.x=Math.max(0,Math.min(W-crop.w,startCrop.x+dx));crop.y=Math.max(0,Math.min(H-crop.h,startCrop.y+dy))}
+ else{
+   let left=startCrop.x,right=startCrop.x+startCrop.w,top=startCrop.y,bottom=startCrop.y+startCrop.h;
+   if(handle.includes('l'))left=Math.max(0,Math.min(right-30,startCrop.x+dx));
+   if(handle.includes('r'))right=Math.min(W,Math.max(left+30,startCrop.x+startCrop.w+dx));
+   if(handle.includes('t'))top=Math.max(0,Math.min(bottom-30,startCrop.y+dy));
+   if(handle.includes('b'))bottom=Math.min(H,Math.max(top+30,startCrop.y+startCrop.h+dy));
+   let nw=right-left,nh=nw/ratio;
+   if(handle.includes('t')||handle.includes('b')){nh=bottom-top;nw=nh*ratio}
+   if(handle==='tl'){left=right-nw;top=bottom-nh}
+   if(handle==='tr'){right=left+nw;top=bottom-nh}
+   if(handle==='bl'){left=right-nw;bottom=top+nh}
+   if(handle==='br'){right=left+nw;bottom=top+nh}
+   if(left<0){left=0;right=Math.min(W,left+nw);nh=(right-left)/ratio;top=bottom-nh}
+   if(right>W){right=W;left=Math.max(0,right-nw);nh=(right-left)/ratio;top=bottom-nh}
+   if(top<0){top=0;bottom=Math.min(H,top+nh);nw=(bottom-top)*ratio;left=right-nw}
+   if(bottom>H){bottom=H;top=Math.max(0,bottom-nh);nw=(bottom-top)*ratio;left=right-nw}
+   crop={x:left,y:top,w:right-left,h:bottom-top};
+ }
+ cropDOM();
+});
+window.addEventListener('pointerup',()=>dragCrop=false);
+
+$('export').onclick=()=>{
+  if(!layers.length){alert('请先添加图片');return;}
+  try{renderExport();}
+  catch(e){console.error(e);alert('导出预览失败：'+(e&&e.message?e.message:e));}
+};
+
+async function canvasToBlob(canvas,type,quality){
+  return new Promise((resolve)=>{
+    try{
+      if(canvas.toBlob){
+        canvas.toBlob((b)=>{
+          if(b) resolve(b);
+          else{
+            try{
+              const data=canvas.toDataURL(type||'image/png',quality);
+              const bin=atob(data.split(',')[1]);
+              const arr=new Uint8Array(bin.length);
+              for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+              resolve(new Blob([arr],{type:type||'image/png'}));
+            }catch(_){resolve(null);}
+          }
+        }, type||'image/png', quality);
+        return;
+      }
+      const data=canvas.toDataURL(type||'image/png',quality);
+      const bin=atob(data.split(',')[1]);
+      const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      resolve(new Blob([arr],{type:type||'image/png'}));
+    }catch(e){console.error(e);resolve(null);}
+  });
+}
+
+$('saveBtn').onclick=async()=>{
+  if(!fullCanvas){alert('没有可保存的画面，请先点导出');return;}
+  const btn=$('saveBtn');
+  const oldText=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳ 生成中…';
+  try{
+    const pw=Math.max(1,preview.clientWidth||1);
+    const ph=Math.max(1,preview.clientHeight||1);
+    const sx=fullCanvas.width/pw, sy=fullCanvas.height/ph;
+    let x=Math.round(crop.x*sx), y=Math.round(crop.y*sy);
+    let w=Math.round(crop.w*sx), h=Math.round(crop.h*sy);
+    x=Math.max(0,Math.min(fullCanvas.width-1,x));
+    y=Math.max(0,Math.min(fullCanvas.height-1,y));
+    w=Math.max(1,Math.min(fullCanvas.width-x,w));
+    h=Math.round(w*16/9);
+    if(y+h>fullCanvas.height){h=fullCanvas.height-y;w=Math.max(1,Math.round(h*9/16));}
+    if(w<2||h<2){alert('裁剪区域过小');return;}
+    const out=document.createElement('canvas');
+    out.width=w;out.height=h;
+    const octx=out.getContext('2d');
+    octx.drawImage(fullCanvas,x,y,w,h,0,0,w,h);
+    const blob=await canvasToBlob(out,'image/png');
+    if(!blob){alert('生成图片失败，请重试');return;}
+    const fileName=`compose_9x16_${Date.now()}.png`;
+    const file=new File([blob],fileName,{type:'image/png'});
+    // 1) iOS / 支持分享文件的浏览器
+    if(navigator.share){
+      try{
+        if(!navigator.canShare || navigator.canShare({files:[file]})){
+          await navigator.share({files:[file],title:'9:16 合成图片'});
+          $('save').style.display='none';
+          return;
+        }
+      }catch(e){
+        if(e && e.name==='AbortError') return; // 用户取消
+        console.warn('share files failed', e);
+      }
+    }
+    // 2) 普通下载
+    try{
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=fileName;
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{try{a.remove();URL.revokeObjectURL(url);}catch(_){}},2000);
+      // iOS 上 download 常被忽略，再尝试打开预览页长按保存
+      const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+      if(isIOS){
+        const win=window.open('');
+        if(win){
+          win.document.write('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>长按图片保存</title></head><body style="margin:0;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;color:#fff;font-family:sans-serif"><p style="padding:12px;text-align:center">请长按下方图片 → 存储到照片</p><img src="'+url+'" style="max-width:100%;height:auto"></body></html>');
+          win.document.close();
+        }else{
+          alert('请允许弹窗，或长按预览图保存；若仍失败请用系统分享。');
+        }
+      }
+      $('save').style.display='none';
+      return;
+    }catch(e2){console.warn(e2);}
+    // 3) 最后手段：dataURL 新窗口
+    try{
+      const data=out.toDataURL('image/png');
+      const win=window.open(data);
+      if(!win) alert('无法打开预览，请检查浏览器是否拦截弹窗');
+      else $('save').style.display='none';
+    }catch(e3){
+      alert('保存失败：'+(e3&&e3.message?e3.message:e3));
+    }
+  }finally{
+    btn.disabled=false;btn.textContent=oldText||'💾 保存到照片';
+  }
+};
+$('closeSave').onclick=()=>$('save').style.display='none';
+
+/* ========== 分屏对比 ========== */
+let compareRef=null, compareEdit=null;
+const co=$('compareOverlay'), refImg=$('refImg'), editImg=$('editImg'), refStage=$('refStage'), editStage=$('editStage');
+function applyLayerToImg(l, img){
+  if(!l||!img)return;
+  if(img.getAttribute('data-src')!==l.el.src){img.src=l.el.src;img.setAttribute('data-src',l.el.src);}
+  img.style.width=l.nw+'px';img.style.height=l.nh+'px';
+  const sx=l.scaleX!=null?l.scaleX:(l.scale||1);
+  const sy=l.scaleY!=null?l.scaleY:(l.scale||1);
+  img.style.transform=`translate(calc(-50% + ${l.x}px),calc(-50% + ${l.y}px)) rotate(${l.rotate}deg) scale(${sx*(l.flip?-1:1)},${sy})`;
+  img.style.opacity=l.opacity;img.style.filter=filter(l);img.style.willChange='transform';
+}
+function updateCompareVisuals(){if(!compareRef||!compareEdit)return;applyLayerToImg(compareRef,refImg);applyLayerToImg(compareEdit,editImg);}
+function updateEditImgOnly(){if(!compareEdit)return;applyLayerToImg(compareEdit,editImg);}
+function fillRefSelect(){
+  const sel=$('refSelect');sel.innerHTML='';
+  layers.forEach(l=>{if(l===active)return;const opt=document.createElement('option');opt.value=l.id;opt.textContent=(l.locked?'🔒 ':'')+(l.bg?'🖼️ 背景':'🎨 贴图 '+l.id);sel.appendChild(opt);});
+  if(sel.options.length){compareRef=layers.find(l=>l.id==sel.value)||layers.find(l=>l!==active);sel.value=compareRef?compareRef.id:'';}
+}
+$('compare').onclick=()=>{
+  if(!active||layers.length<2)return;
+  compareEdit=active;fillRefSelect();
+  if(!compareRef){alert('请先添加至少两个图层');return;}
+  refStage.style.flex='1';editStage.style.flex='1';
+  updateCompareVisuals();
+  co.style.display='flex';
+  document.documentElement.style.overflow='hidden';
+  document.body.style.overflow='hidden';
+  document.body.style.overscrollBehavior='none';
+};
+$('refSelect').onchange=()=>{compareRef=layers.find(l=>l.id==+$('refSelect').value)||null;updateCompareVisuals();};
+$('exitCompare').onclick=()=>{
+  co.style.display='none';compareRef=null;compareEdit=null;
+  document.documentElement.style.overflow='';document.body.style.overflow='';document.body.style.overscrollBehavior='';
+  if(active){update(active);sync(active);}
+};
+(function(){
+  let dragging=false, pinching=false, sx=0,sy=0,ox=0,oy=0,dist0=0,ang0=0,scale0X=1,scale0Y=1,rot0=0, rafId=0;
+  const pos=e=>e.touches?e.touches[0]:e;
+  const scheduleVisual=()=>{if(rafId)return;rafId=requestAnimationFrame(()=>{rafId=0;updateEditImgOnly();});};
+  const onStart=e=>{
+    if(co.style.display!=='flex'||!compareEdit||compareEdit.locked)return;
+    if(window.__guideDragging)return;
+    if(e.target.closest('.compare-guide,.compare-vguide,.width-caliper,.right-mark,#markShoulder,#markHead,#markFoot,#widthRulerL'))return;
+    if(!e.target.closest('#editStage,#editImg'))return;
+    e.stopPropagation();if(e.cancelable)e.preventDefault();
+    if(e.touches&&e.touches.length===2){
+      dragging=false;pinching=true;
+      let a=e.touches[0],b=e.touches[1];
+      dist0=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);
+      ang0=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
+      scale0X=compareEdit.scaleX;scale0Y=compareEdit.scaleY;rot0=compareEdit.rotate;
+      return;
+    }
+    pinching=false;
+    let p=pos(e);dragging=true;sx=p.clientX;sy=p.clientY;ox=compareEdit.x;oy=compareEdit.y;
+  };
+  const onMove=e=>{
+    if(co.style.display!=='flex'||!compareEdit||compareEdit.locked)return;
+    if(window.__guideDragging){dragging=false;pinching=false;return;}
+    if(e.touches&&e.touches.length===2){
+      if(e.cancelable)e.preventDefault();
+      let a=e.touches[0],b=e.touches[1],d=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY),an=Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI;
+      if(!dist0)return;
+      const f=d/dist0;
+      compareEdit.scaleX=Math.max(.1,Math.min(3,scale0X*f));
+      compareEdit.scaleY=Math.max(.1,Math.min(3,scale0Y*f));
+      compareEdit.rotate=rot0+an-ang0;
+      scheduleVisual();
+      return;
+    }
+    if(!dragging)return;
+    if(e.cancelable)e.preventDefault();
+    let p=pos(e),nx=ox+p.clientX-sx,ny=oy+p.clientY-sy;
+    if(Math.abs(nx)<3)nx=0;if(Math.abs(ny)<3)ny=0;
+    compareEdit.x=nx;compareEdit.y=ny;
+    scheduleVisual();
+  };
+  const onEnd=()=>{
+    if(window.__guideDragging){dragging=false;pinching=false;return;}
+    if(dragging||pinching){
+      dragging=false;pinching=false;
+      update(compareEdit);sync(compareEdit);updateEditImgOnly();
+    }
+  };
+  editStage.addEventListener('touchstart',onStart,{passive:false});
+  editStage.addEventListener('mousedown',onStart);
+  editImg.addEventListener('touchstart',onStart,{passive:false});
+  editImg.addEventListener('mousedown',onStart);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('mousemove',onMove);
+  window.addEventListener('touchend',onEnd,{passive:false});
+  window.addEventListener('mouseup',onEnd);
+})();
+(function(){
+  const div=$('compareDivider');
+  let startX=0, startLeft=0, startRight=0;
+  const onDown=e=>{
+    e.preventDefault();e.stopPropagation();
+    const p=e.touches?e.touches[0]:e;
+    startX=p.clientX;
+    const leftW=refStage.offsetWidth, rightW=editStage.offsetWidth;
+    startLeft=leftW;startRight=rightW;
+    div.setPointerCapture?.(e.pointerId);
+  };
+  const onMove=e=>{
+    if(!startX)return;
+    e.preventDefault();
+    const p=e.touches?e.touches[0]:e;
+    const dx=p.clientX-startX;
+    const total=startLeft+startRight;
+    let newLeft=Math.max(60,Math.min(total-60,startLeft+dx));
+    let newRight=total-newLeft;
+    refStage.style.flex=`0 0 ${newLeft}px`;
+    editStage.style.flex=`0 0 ${newRight}px`;
+  };
+  const onUp=()=>{startX=0};
+  div.addEventListener('pointerdown',onDown);
+  div.addEventListener('touchstart',onDown,{passive:false});
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('touchend',onUp);
+})();
+(function(){
+  function makeGuide(id){
+    const line=$(id);
+    if(!line)return;
+    let startY=0, startTop=0, dragging=false, activePointer=null;
+    const onDown=e=>{
+      e.preventDefault();e.stopPropagation();
+      if(e.touches&&e.touches.length>1)return;
+      const p=e.touches?e.touches[0]:e;
+      startY=p.clientY;
+      const st=line.style.top;
+      startTop=(st&&st.endsWith('px'))?parseFloat(st):(line.offsetTop||0);
+      dragging=true;
+      activePointer=e.pointerId!=null?e.pointerId:'touch';
+      window.__guideDragging=true;
+      try{line.setPointerCapture?.(e.pointerId);}catch(_){}
+    };
+    const onMove=e=>{
+      if(!dragging)return;
+      e.preventDefault();e.stopPropagation();
+      if(e.pointerId!=null&&activePointer!=null&&e.pointerId!==activePointer)return;
+      const p=e.touches?e.touches[0]:e;
+      if(!p)return;
+      const box=$('compareBox');
+      const boxH=box?box.clientHeight:400;
+      const h=line.offsetHeight||32;
+      const minT=4;
+      const maxT=Math.max(minT, boxH-h-36);
+      let ny=startTop+(p.clientY-startY);
+      ny=Math.max(minT, Math.min(maxT, ny));
+      line.style.top=Math.round(ny)+'px';
+    };
+    const onUp=e=>{
+      if(e&&e.pointerId!=null&&activePointer!=null&&e.pointerId!==activePointer)return;
+      dragging=false;startY=0;activePointer=null;
+      window.__guideDragging=false;
+    };
+    line.addEventListener('pointerdown',onDown,{passive:false});
+    window.addEventListener('pointermove',onMove,{capture:true,passive:false});
+    window.addEventListener('pointerup',onUp,{capture:true});
+    window.addEventListener('pointercancel',onUp,{capture:true});
+  }
+  window.__resetGuideLines=function(){
+    const box=$('compareBox');
+    const boxH=box?box.clientHeight:400;
+    const g1=$('guideLine1'), g4=$('guideLine4');
+    const h=32;
+    if(g1) g1.style.top=Math.round(boxH*0.18 - h/2)+'px';
+    if(g4) g4.style.top=Math.round(boxH*0.72 - h/2)+'px';
+  };
+  makeGuide('guideLine1');
+  makeGuide('guideLine4');
+  makeGuide('markHead');
+  makeGuide('markFoot');
+})();
+(function(){
+  const vL=$('centerGuideL'), vR=$('centerGuideR');
+  if(!vL||!vR)return;
+  let startX=0, startCL=0, startCR=0, dragging=false;
+  const getCenter=el=>{
+    const s=el.style.left;
+    if(s&&s.endsWith('px')) return parseFloat(s);
+    if(s&&s.endsWith('%')) return (parseFloat(s)/100)*($('compareBox').clientWidth||400);
+    return el.offsetLeft + el.offsetWidth/2;
+  };
+  const onDown=e=>{
+    e.preventDefault();e.stopPropagation();
+    const p=e.touches?e.touches[0]:e;
+    startX=p.clientX;
+    startCL=getCenter(vL);
+    startCR=getCenter(vR);
+    dragging=true;
+    window.__guideDragging=true;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onMove=e=>{
+    if(!dragging)return;
+    e.preventDefault();e.stopPropagation();
+    const p=e.touches?e.touches[0]:e;
+    const dx=p.clientX-startX;
+    const boxW=$('compareBox').clientWidth||400;
+    let cL=startCL+dx, cR=startCR+dx;
+    const minGap=24;
+    if(cR-cL<minGap){const mid=(cL+cR)/2;cL=mid-minGap/2;cR=mid+minGap/2;}
+    cL=Math.max(8,Math.min(boxW-8,cL));
+    cR=Math.max(8,Math.min(boxW-8,cR));
+    if(cR-cL<minGap){cR=cL+minGap;if(cR>boxW-8){cR=boxW-8;cL=cR-minGap;}}
+    vL.style.left=cL+'px';
+    vR.style.left=cR+'px';
+  };
+  const onUp=()=>{dragging=false;window.__guideDragging=false;};
+  [vL,vR].forEach(line=>{
+    line.addEventListener('pointerdown',onDown);
+    line.addEventListener('touchstart',onDown,{passive:false});
+  });
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('touchend',onUp);
+})();
+(function(){
+  const btn=$('nudgeToggle'), pad=$('nudgePad');
+  if(!btn||!pad)return;
+  btn.onclick=()=>{
+    const show=pad.style.display==='none'||!pad.style.display;
+    pad.style.display=show?'flex':'none';
+    btn.classList.toggle('primary',show);
+    btn.textContent=show?'🎛️ 微调:开':'🎛️ 微调';
+  };
+})();
+
+/* 分屏：测量 & 对齐身高/宽度 */
+function guideCenterY(id){
+  const el=$(id);const box=$('compareBox');
+  if(!el||!box)return 0;
+  const er=el.getBoundingClientRect();const br=box.getBoundingClientRect();
+  return (er.top+er.height/2)-br.top;
+}
+function updateMeasureReadout(){
+  const out=$('measureReadout');
+  if(!out||!compareRef||!compareEdit)return;
+  const box=$('compareBox');
+  const boxH=box?box.clientHeight:1;
+  const y1=guideCenterY('guideLine1');const y4=guideCenterY('guideLine4');
+  const lineDist=Math.abs(y4-y1);
+  const refH=Math.max(1,(compareRef.nh||1)*(compareRef.scaleY||1));
+  const editH=Math.max(1,(compareEdit.nh||1)*(compareEdit.scaleY||1));
+  const heightRatio=(editH/refH)*100;
+  const rul=$('widthRulerL');const rw=rul?(rul.offsetWidth||0):0;
+  const refVisW=Math.max(1,(compareRef.nw||1)*(compareRef.scaleX||1));
+  const editVisW=Math.max(1,(compareEdit.nw||1)*(compareEdit.scaleX||1));
+  const widthRatio=(editVisW/refVisW)*100;
+  out.innerHTML=
+    '身高比 右/左 <b style="color:var(--accent)">'+heightRatio.toFixed(1)+'%</b>'+
+    ' · 左尺 <b style="color:#2dd4a8">'+Math.round(rw)+'px</b>'+
+    ' · 身宽比 右/左 <b style="color:#60a5fa">'+widthRatio.toFixed(1)+'%</b>'+
+    ' · 线距 <b style="color:#f87171">'+Math.round(lineDist)+'px</b>';
+}
+
+/* ========== 联网人体关键点扫描：MediaPipe Pose 33点 ========== */
+let __poseLandmarkerPromise=null;
+function setPoseStatus(msg,kind='info'){
+  const el=$('poseStatus');if(!el)return;
+  const colors={info:'#202330',ok:'#12382f',warn:'#49351b',error:'#4a2027'};
+  const borders={info:'#41475a',ok:'#25866c',warn:'#b7791f',error:'#c2414b'};
+  el.style.background=colors[kind]||colors.info;el.style.borderColor=borders[kind]||borders.info;
+  el.textContent='AI状态：'+msg;
+}
+async function getPoseLandmarker(){
+  if(__poseLandmarkerPromise)return __poseLandmarkerPromise;
+  __poseLandmarkerPromise=(async()=>{
+    const timeout=(ms,msg)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error(msg)),ms));
+    setPoseStatus('正在尝试连接 AI 识别程序服务器…','warn');
+    let mod=null,importErrors=[];
+    // iOS/Safari 或部分网络可能无法加载 jsDelivr 的 +esm，依次尝试不同 CDN 和版本。
+    const sources=[
+      {name:'jsDelivr 0.10.18',url:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/+esm',wasm:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'},
+      {name:'esm.sh 0.10.18',url:'https://esm.sh/@mediapipe/tasks-vision@0.10.18?bundle',wasm:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'},
+      {name:'unpkg 0.10.18',url:'https://unpkg.com/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs',wasm:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'},
+      {name:'jsDelivr 0.10.22',url:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm',wasm:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'}
+    ];
+    let selected=null;
+    for(const src of sources){
+      try{
+        setPoseStatus('正在加载识别程序：'+src.name+'…','warn');
+        mod=await Promise.race([import(src.url),timeout(12000,'连接 '+src.name+' 超时')]);
+        if(!mod?.FilesetResolver||!mod?.PoseLandmarker)throw new Error('该 CDN 返回的模块不完整');
+        selected=src;break;
+      }catch(err){importErrors.push(src.name+': '+(err?.message||String(err)));}
+    }
+    if(!mod||!selected)throw new Error('所有识别程序 CDN 均加载失败。可能是浏览器不允许模块导入，或网络拦截了 CDN。\n'+importErrors.join('；'));
+    setPoseStatus('识别程序加载成功（'+selected.name+'），正在初始化 WASM…','warn');
+    const vision=await Promise.race([mod.FilesetResolver.forVisionTasks(selected.wasm),timeout(20000,'WASM 初始化超时')]);
+    setPoseStatus('WASM 初始化成功，正在下载人体关键点模型…','warn');
+    const modelUrl='https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+    let model;
+    try{
+      model=await Promise.race([mod.PoseLandmarker.createFromOptions(vision,{
+        baseOptions:{modelAssetPath:modelUrl,delegate:'CPU'},runningMode:'IMAGE',numPoses:1,
+        minPoseDetectionConfidence:0.35,minPosePresenceConfidence:0.35,minTrackingConfidence:0.35
+      }),timeout(35000,'人体模型下载或初始化超时')]);
+    }catch(e){throw new Error('人体模型加载失败：'+(e?.message||String(e))+'。请检查 Google 模型服务器是否可访问。');}
+    setPoseStatus('联网成功，人体模型已就绪，开始扫描两侧人物…','ok');
+    return model;
+  })();
+  try{return await __poseLandmarkerPromise}catch(e){__poseLandmarkerPromise=null;throw e;}
+}
+function poseBounds(result){
+  const p=result?.landmarks?.[0];if(!p||p.length<33)return null;
+  const good=i=>(p[i]&&((p[i].visibility??1)>.22));
+  // 更稳健的头顶：优先人脸关键点（鼻/眼/耳），避免仅用肩导致“头”过低
+  const faceIds=[0,1,2,3,4,5,6,7,8,9,10].filter(good);
+  const headIds=(faceIds.length?faceIds:[0,11,12]).filter(good);
+  if(headIds.length===0||!good(23)||!good(24))return null;
+  const headY=Math.min(...headIds.map(i=>p[i].y));
+  // 脚：优先脚踝 27/28，其次脚后跟/脚尖
+  let feet=[27,28].filter(good);
+  if(feet.length<2) feet=[27,28,29,30,31,32].filter(good);
+  if(feet.length===0) feet=[25,26].filter(good);
+  if(!feet.length)return null;
+  const footY=Math.max(...feet.map(i=>p[i].y));
+  const hipY=(p[23].y+p[24].y)/2;
+  const hipW=Math.abs(p[23].x-p[24].x);
+  const hipX=(p[23].x+p[24].x)/2;
+  // 肩宽更贴近视觉“身宽”，优先用于横向缩放
+  let shoulderW=0, shoulderX=hipX, shoulderY=hipY;
+  if(good(11)&&good(12)){
+    shoulderW=Math.abs(p[11].x-p[12].x);
+    shoulderX=(p[11].x+p[12].x)/2;
+    shoulderY=(p[11].y+p[12].y)/2;
+  }
+  // 有效宽度：肩优先，肩不可用则用髋；若两者都有则取较大者并略加权肩
+  let bodyW=hipW;
+  if(shoulderW>0.008){
+    bodyW=shoulderW>hipW*0.85 ? shoulderW : (shoulderW*0.65+hipW*0.35);
+  }
+  if(!Number.isFinite(headY)||!Number.isFinite(footY)||footY-headY<.10||bodyW<.004)return null;
+  // 躯干高度：肩到髋，用于腰臀比例对齐（忽略全身高矮）
+  let torsoH=0;
+  if(shoulderW>0.008 && Number.isFinite(shoulderY)){
+    torsoH=Math.max(0.04, Math.abs(hipY-shoulderY));
+  } else {
+    torsoH=Math.max(0.04, (footY-headY)*0.35);
+  }
+  return {
+    headY,footY,height:footY-headY,
+    hipW,hipX,hipY,
+    shoulderW,shoulderX,shoulderY,
+    bodyW, bodyX: shoulderW>0.008 ? shoulderX : hipX,
+    torsoH
+  };
+}
+async function scanPoseLayer(layer,label){
+  if(!layer?.el?.complete||!layer.el.naturalWidth)throw new Error(label+'图片尚未加载完成');
+  setPoseStatus('正在识别'+label+'人物关键点…','warn');
+  const model=await getPoseLandmarker();
+  const result=model.detect(layer.el);
+  const b=poseBounds(result);
+  if(!b)throw new Error(label+'未能识别完整人物（请确保头部、骨盆和脚部尽量清晰可见）');
+  return b;
+}
+$('aiPoseAlign').onclick=async()=>{
+  if(!compareRef||!compareEdit){setPoseStatus('请先进入分屏，并确认左侧参考图和右侧待调整图都已选择。','error');alert('请先进入分屏，并确认左侧参考图和右侧待调整图都已选择。');return;}
+  const btn=$('aiPoseAlign'),old=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳ 检查网络/加载模型…';
+  setPoseStatus('已启动。正在检查联网模型；请保持网络连接，首次加载可能需要一些时间…','warn');
+  try{
+    if(navigator.onLine===false)throw new Error('浏览器报告当前处于离线状态');
+    const [L,R]=await Promise.all([scanPoseLayer(compareRef,'左侧参考'),scanPoseLayer(compareEdit,'右侧待调整')]);
+    // 核心：对齐腰/髋位置与比例；全身高矮可忽略。横向用肩/髋宽，纵向用躯干（肩→髋）比例
+    const refNh=compareRef.nh||compareRef.el.naturalHeight;
+    const refNw=compareRef.nw||compareRef.el.naturalWidth;
+    const editNh=compareEdit.nh||compareEdit.el.naturalHeight;
+    const editNw=compareEdit.nw||compareEdit.el.naturalWidth;
+    const refSy=compareRef.scaleY||1, refSx=compareRef.scaleX||1;
+    // 横向：肩宽优先
+    const refW=(L.bodyW||L.hipW)*refNw*refSx;
+    const editW=(R.bodyW||R.hipW)*editNw;
+    let kx=Math.max(.05,Math.min(8,refW/Math.max(1,editW)));
+    // 纵向：按躯干（肩到髋）比例，而不是全身头脚高度
+    const refTorso=(L.torsoH||0.12)*refNh*refSy;
+    const editTorso=(R.torsoH||0.12)*editNh;
+    let ky=Math.max(.05,Math.min(8,refTorso/Math.max(1,editTorso)));
+    // 宽高比不要差太离谱（衣物/透视差异时向宽度靠拢）
+    const ratio=kx/ky;
+    if(ratio>1.40){ky=kx/1.25;}
+    else if(ratio<0.72){ky=kx/0.80;}
+    const box=$('compareBox'),bh=box.clientHeight||400,bw=(box.clientWidth/2)||200;
+    // 垂直锚点：对齐髋部中心（腰臀）
+    const refHipScreenY=bh/2+(compareRef.y||0)+(L.hipY-.5)*refNh*refSy;
+    const newY=refHipScreenY-bh/2-(R.hipY-.5)*editNh*ky;
+    // 水平：对齐肩/身宽中心
+    const Lcx=L.bodyX!=null?L.bodyX:L.hipX;
+    const Rcx=R.bodyX!=null?R.bodyX:R.hipX;
+    const refCX=bw/2+(compareRef.x||0)+(Lcx-.5)*refNw*refSx;
+    const newX=refCX-bw/2-(Rcx-.5)*editNw*kx;
+    compareEdit.scaleX=kx;compareEdit.scaleY=ky;compareEdit.x=newX;compareEdit.y=newY;
+    update(compareEdit);sync(compareEdit);updateEditImgOnly();updateCompareVisuals();
+    // 自动把参考线/标记挪到腰臀与肩位置
+    try{
+      const setGuideY=(id,normY,layer,sy)=>{
+        const el=$(id);if(!el||!layer)return;
+        const nh=layer.nh||layer.el.naturalHeight;
+        const screenY=bh/2+(layer.y||0)+(normY-0.5)*nh*sy;
+        el.style.top=(screenY-(el.offsetHeight||28)/2)+'px';
+      };
+      // 线1 → 肩，线4 → 髋（更符合腰臀对齐）
+      const Lsh = (L.shoulderY!=null)?L.shoulderY:L.headY;
+      const Rsh = (R.shoulderY!=null)?R.shoulderY:R.headY;
+      setGuideY('guideLine1', Lsh, compareRef, refSy);
+      setGuideY('guideLine4', L.hipY, compareRef, refSy);
+      setGuideY('markHead', Rsh, compareEdit, ky);
+      setGuideY('markFoot', R.hipY, compareEdit, ky);
+      const sh=$('markShoulder');
+      if(sh){
+        const screenY=bh/2+(compareEdit.y||0)+(Rsh-0.5)*editNh*ky;
+        sh.style.top=(screenY-(sh.offsetHeight||28)/2)+'px';
+      }
+    }catch(_){}
+    updateMeasureReadout();
+    const wSrc=(L.shoulderW>0.008)?'肩宽':'髋宽';
+    setPoseStatus('联网成功，已按腰/髋对齐。横向用'+wSrc+'，纵向用躯干比例（肩→髋），全身高矮已弱化（Y×'+ky.toFixed(2)+' / X×'+kx.toFixed(2)+'）。可再微调。','ok');
+    btn.textContent='✅ 扫描对齐完成';
+  }catch(e){
+    console.error(e);
+    const msg=e?.message||'未知错误';
+    const netMsg=(navigator.onLine===false||/fetch|network|load|import|CORS|Failed to|模型|CDN|模块/i.test(msg))?'浏览器可能无法导入 AI 模块，或 CDN/Google 模型服务器被网络拦截。请切换 Wi‑Fi/移动数据后重试；若仍失败，需使用可访问这些服务器的网络。':'请换一张头部、骨盆和脚部清晰可见的人物图后重试。';
+    setPoseStatus('失败：'+msg+'。'+netMsg,'error');
+    alert('AI人物扫描失败：'+msg+'\n\n联网状态：'+(navigator.onLine===false?'浏览器显示离线':'浏览器未报告离线，但模型服务器连接仍可能失败')+'\n'+netMsg);
+    btn.textContent='⚠️ 扫描失败';
+  }finally{btn.disabled=false;setTimeout(()=>{btn.textContent=old;},2500);}
+};
+
+$('alignHeight').onclick=()=>{
+  if(!compareEdit)return;
+  const box=$('compareBox');
+  if(!box)return;
+  const boxH=box.clientHeight||400;
+  void box.offsetHeight;
+  let t1=guideCenterY('guideLine1');let t4=guideCenterY('guideLine4');
+  if(t1>t4){const tmp=t1;t1=t4;t4=tmp;}
+  const spanT=Math.max(20, t4-t1);
+  let m1=guideCenterY('markHead');let m4=guideCenterY('markFoot');
+  if(m1>m4){const tmp=m1;m1=m4;m4=tmp;}
+  const spanM=Math.max(20, m4-m1);
+  const k=spanT/spanM;
+  const oldSy=compareEdit.scaleY||1;
+  const newSy=Math.max(0.1, Math.min(3, oldSy*k));
+  const appliedK=newSy/Math.max(0.001, oldSy);
+  const oldSx=compareEdit.scaleX||1;
+  const newSx=Math.max(0.1, Math.min(3, oldSx*appliedK));
+  const panelCY=boxH/2;
+  const C=panelCY+(compareEdit.y||0);
+  const C2=t1 - appliedK*(m1-C);
+  compareEdit.scaleY=newSy;compareEdit.scaleX=newSx;compareEdit.y=C2-panelCY;
+  update(compareEdit);sync(compareEdit);updateEditImgOnly();updateCompareVisuals();
+  const mh=$('markHead'), mf=$('markFoot');
+  if(mh) mh.style.top=(t1-(mh.offsetHeight||28)/2)+'px';
+  if(mf) mf.style.top=(t4-(mf.offsetHeight||28)/2)+'px';
+  if(typeof window.__resetGuideLines==='function') window.__resetGuideLines();
+  updateMeasureReadout();
+};
+function bandOpaqueScreenWidth(imgEl, screenY){
+  try{
+    if(!imgEl||!imgEl.naturalWidth)return 0;
+    const rect=imgEl.getBoundingClientRect();
+    if(rect.width<2||rect.height<2)return 0;
+    const relY=Math.max(0, Math.min(1, (screenY-rect.top)/rect.height));
+    const nw=imgEl.naturalWidth, nh=imgEl.naturalHeight;
+    const maxE=360;const s=Math.min(1, maxE/Math.max(nw,nh));
+    const cw=Math.max(1,Math.round(nw*s)), ch=Math.max(1,Math.round(nh*s));
+    const c=document.createElement('canvas');c.width=cw;c.height=ch;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(imgEl,0,0,cw,ch);
+    const data=ctx.getImageData(0,0,cw,ch).data;
+    const row=Math.round(relY*(ch-1));
+    const half=Math.max(2, Math.round(ch*0.035));
+    const cx=cw/2;
+    let sumW=0, nW=0;
+    for(let y=Math.max(0,row-half); y<=Math.min(ch-1,row+half); y++){
+      const runs=[];let x=0;
+      while(x<cw){
+        while(x<cw&&data[(y*cw+x)*4+3]<14)x++;
+        if(x>=cw)break;
+        const x0=x;
+        while(x<cw&&data[(y*cw+x)*4+3]>=14)x++;
+        runs.push({x0,x1:x-1,w:x-x0});
+      }
+      if(!runs.length)continue;
+      let best=null;
+      for(const r of runs){if(r.x0<=cx&&r.x1>=cx){best=r;break;}}
+      if(!best){best=runs[0];for(const r of runs){if(r.w>best.w)best=r;}}
+      if(best.w<cw*0.02)continue;
+      sumW+=best.w;nW++;
+    }
+    if(!nW)return 0;
+    return rect.width*((sumW/nW)/cw);
+  }catch(_){return 0;}
+}
+$('alignWidth').onclick=()=>{
+  if(!compareEdit||!compareRef)return;
+  const rul=$('widthRulerL');const mark=$('markShoulder');
+  if(!rul)return;
+  void $('compareBox').offsetHeight;
+  updateEditImgOnly();void editImg.offsetWidth;
+  const targetW=Math.max(4, rul.getBoundingClientRect().width||rul.offsetWidth||0);
+  let scanY;
+  if(mark){const mr=mark.getBoundingClientRect();scanY=mr.top+mr.height/2;}
+  else{const rr=rul.getBoundingClientRect();scanY=rr.top+rr.height/2;}
+  let curW=bandOpaqueScreenWidth(editImg, scanY);
+  if(curW<4){const rightBox=Math.max(4, editImg.getBoundingClientRect().width||1);curW=rightBox*0.5;}
+  const oldSx=compareEdit.scaleX||1;
+  let k=targetW/curW;
+  let newSx=oldSx*k;
+  newSx=Math.max(0.15, Math.min(3, newSx));
+  compareEdit.scaleX=newSx;
+  update(compareEdit);sync(compareEdit);updateEditImgOnly();updateCompareVisuals();
+  if(mark){
+    const boxW=$('compareBox').clientWidth||400;
+    const w=Math.min(targetW, boxW*0.48);
+    const mid=mark.offsetLeft+(mark.offsetWidth||w)/2;
+    mark.style.width=w+'px';
+    mark.style.left=Math.max(boxW*0.5+4, Math.min(boxW-w-4, mid-w/2))+'px';
+  }
+  updateMeasureReadout();
+};
+(function(){
+  const refresh=()=>updateMeasureReadout();
+  ['guideLine1','guideLine4','widthRulerL','markShoulder','markHead','markFoot'].forEach(id=>{
+    const el=$(id);if(!el)return;
+    el.addEventListener('pointerup',refresh);
+    el.addEventListener('touchend',refresh);
+  });
+  const _ucv=updateCompareVisuals;
+  updateCompareVisuals=function(){if(window.__guideDragging)return;_ucv();updateMeasureReadout();};
+  const _ueo=updateEditImgOnly;
+  updateEditImgOnly=function(){if(window.__guideDragging)return;_ueo();updateMeasureReadout();};
+})();
+['scaleX','scaleY','rotate','opacity'].forEach(id=>{
+  const el=$(id);const old=el.oninput;
+  el.oninput=e=>{if(typeof old==='function')old(e);if(co.style.display==='flex'&&compareEdit)updateCompareVisuals();};
+});
+
+/* 微调按键 */
+(function(){
+  const STEP=4;const SCALE_STEP=0.02;
+  let holdTimer=null, repeatTimer=null, activeBtn=null;
+  function stopAll(){if(holdTimer){clearTimeout(holdTimer);holdTimer=null;}if(repeatTimer){clearInterval(repeatTimer);repeatTimer=null;}activeBtn=null;}
+  function nudge(action){
+    if(!compareEdit)return;
+    switch(action){
+      case 'up':    compareEdit.y-=STEP; break;
+      case 'down':  compareEdit.y+=STEP; break;
+      case 'left':  compareEdit.x-=STEP; break;
+      case 'right': compareEdit.x+=STEP; break;
+      case 'taller': compareEdit.scaleY=Math.min(3,(compareEdit.scaleY||1)+SCALE_STEP); break;
+      case 'shorter': compareEdit.scaleY=Math.max(0.1,(compareEdit.scaleY||1)-SCALE_STEP); break;
+      case 'wider': compareEdit.scaleX=Math.min(3,(compareEdit.scaleX||1)+SCALE_STEP); break;
+      case 'thinner': compareEdit.scaleX=Math.max(0.1,(compareEdit.scaleX||1)-SCALE_STEP); break;
+    }
+    update(compareEdit);sync(compareEdit);updateEditImgOnly();
+  }
+  document.querySelectorAll('.nudge-btn').forEach(btn=>{
+    btn.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();
+      stopAll();activeBtn=btn;
+      const action=btn.dataset.nudge;
+      nudge(action);
+      holdTimer=setTimeout(()=>{
+        holdTimer=null;
+        repeatTimer=setInterval(()=>{if(activeBtn!==btn){stopAll();return;}nudge(action);},70);
+      },400);
+      try{btn.setPointerCapture(e.pointerId);}catch(_){}
+    });
+    btn.addEventListener('pointerup',e=>{e.preventDefault();stopAll();});
+    btn.addEventListener('pointercancel',()=>stopAll());
+    btn.addEventListener('lostpointercapture',()=>stopAll());
+  });
+  window.addEventListener('pointerup',stopAll);
+  window.addEventListener('pointercancel',stopAll);
+  window.addEventListener('touchend',stopAll,{passive:true});
+  window.addEventListener('touchcancel',stopAll,{passive:true});
+  const exitBtn=$('exitCompare');
+  if(exitBtn){exitBtn.addEventListener('click',stopAll);}
+})();
+
+/* 左尺 */
+(function(){
+  function setupCaliper(id){
+    const el=$(id);
+    if(!el)return;
+    const isLeft=id==='widthRulerL';
+    let mode=null;
+    let startX=0, startY=0, startLeft=0, startWidth=0, startTop=0;
+    const onDown=e=>{
+      e.preventDefault();e.stopPropagation();
+      const p=e.touches?e.touches[0]:e;
+      const target=e.target;
+      startX=p.clientX;startY=p.clientY;
+      startLeft=el.offsetLeft;startWidth=el.offsetWidth;startTop=el.offsetTop;
+      if(target.classList.contains('caliper-handle-l')||target.dataset.side==='l') mode='l';
+      else if(target.classList.contains('caliper-handle-r')||target.dataset.side==='r') mode='r';
+      else mode='move';
+      window.__guideDragging=true;
+      el.setPointerCapture?.(e.pointerId);
+    };
+    const onMove=e=>{
+      if(!mode)return;
+      e.preventDefault();e.stopPropagation();
+      const p=e.touches?e.touches[0]:e;
+      const box=$('compareBox');
+      const boxW=box.clientWidth||400, boxH=box.clientHeight||400;
+      const mid=boxW/2;
+      let minL=4, maxR=boxW-4;
+      if(isLeft){minL=4;maxR=mid-4;}
+      const dx=p.clientX-startX, dy=p.clientY-startY;
+      if(mode==='move'){
+        let nt=startTop+dy;let nl=startLeft+dx;
+        nt=Math.max(0,Math.min(boxH-40,nt));
+        nl=Math.max(minL,Math.min(maxR-startWidth,nl));
+        el.style.top=nt+'px';el.style.left=nl+'px';
+      }else if(mode==='l'){
+        let nl=startLeft+dx;let nw=startWidth-dx;
+        if(nw<36){nw=36;nl=startLeft+startWidth-36;}
+        nl=Math.max(minL,Math.min(maxR-nw,nl));
+        el.style.left=nl+'px';el.style.width=nw+'px';
+      }else if(mode==='r'){
+        let nw=startWidth+dx;
+        if(nw<36)nw=36;
+        if(startLeft+nw>maxR)nw=maxR-startLeft;
+        el.style.width=nw+'px';
+      }
+    };
+    const onUp=()=>{mode=null;window.__guideDragging=false;};
+    el.addEventListener('pointerdown',onDown);
+    el.addEventListener('touchstart',onDown,{passive:false});
+    el.querySelectorAll('.caliper-handle-l,.caliper-handle-r').forEach(h=>{
+      h.addEventListener('pointerdown',onDown);
+      h.addEventListener('touchstart',onDown,{passive:false});
+    });
+    window.addEventListener('pointermove',onMove);
+    window.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('touchend',onUp);
+  }
+  setupCaliper('widthRulerL');
+})();
+(function(){
+  const el=$('markShoulder');
+  if(!el)return;
+  let mode=null, startX=0, startY=0, startLeft=0, startTop=0, startW=0;
+  const onDown=e=>{
+    e.preventDefault();e.stopPropagation();
+    const p=e.touches?e.touches[0]:e;
+    startX=p.clientX;startY=p.clientY;
+    startLeft=el.offsetLeft;startTop=el.offsetTop;startW=el.offsetWidth;
+    mode='move';
+    window.__guideDragging=true;
+    el.setPointerCapture?.(e.pointerId);
+  };
+  const onMove=e=>{
+    if(!mode)return;
+    e.preventDefault();e.stopPropagation();
+    const p=e.touches?e.touches[0]:e;
+    const box=$('compareBox');
+    const boxW=box.clientWidth||400, boxH=box.clientHeight||400;
+    const mid=boxW/2;
+    let nl=startLeft+(p.clientX-startX);
+    let nt=startTop+(p.clientY-startY);
+    const w=el.offsetWidth||startW;
+    nl=Math.max(mid+4, Math.min(boxW-w-4, nl));
+    nt=Math.max(0, Math.min(boxH-28, nt));
+    el.style.left=nl+'px';el.style.top=nt+'px';
+  };
+  const onUp=()=>{mode=null;window.__guideDragging=false;};
+  el.addEventListener('pointerdown',onDown);
+  el.addEventListener('touchstart',onDown,{passive:false});
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('touchend',onUp);
+})();
+
+/* 裁为补丁 */
+(function(){
+  const po=$('patchOverlay'), pb=$('patchBox'), pc=$('patchCanvas'), cropEl=$('patchCrop');
+  let pCrop={x:0,y:0,w:0,h:0}, pDrag=false, pSelecting=false;
+  let pStartX=0,pStartY=0,pStartCrop=null;
+
+  function renderStageToCanvas(dest){
+    const sw=Math.max(1,stage.clientWidth||wrap.clientWidth||360);
+    const sh=Math.max(1,stage.clientHeight||wrap.clientHeight||640);
+    dest.width=sw;dest.height=sh;
+    const c=dest.getContext('2d');
+    c.clearRect(0,0,sw,sh);
+    layers.forEach(l=>{
+      if(!l.el||!l.el.src)return;
+      const lsx=l.scaleX!=null?l.scaleX:(l.scale||1);
+      const lsy=l.scaleY!=null?l.scaleY:(l.scale||1);
+      const dw=l.nw*lsx,dh=l.nh*lsy;
+      const cx=sw/2+(l.x||0),cy=sh/2+(l.y||0);
+      c.save();c.globalAlpha=l.opacity!=null?l.opacity:1;
+      try{c.filter=filter(l,false);}catch(_){c.filter='none';}
+      if(l.shadowBlur>0){c.shadowColor=l.shadowColor||'#000';c.shadowBlur=l.shadowBlur;c.shadowOffsetX=l.shadowX||0;c.shadowOffsetY=l.shadowY||0;}
+      c.translate(cx,cy);c.rotate((l.rotate||0)*Math.PI/180);
+      if(l.flip)c.scale(-1,1);
+      try{c.drawImage(l.el,-dw/2,-dh/2,dw,dh);}catch(_){}
+      c.restore();
+    });
+  }
+
+  function fitPatchCanvas(){
+    const boxW=Math.max(pb.clientWidth||0,280);
+    const boxH=Math.max(pb.clientHeight||0,320);
+    if(!pc.width||!pc.height)return;
+    const scale=Math.min(boxW/pc.width,boxH/pc.height)*0.98;
+    pc.style.width=(pc.width*scale)+'px';
+    pc.style.height=(pc.height*scale)+'px';
+  }
+
+  function cropDOM(){
+    if(pCrop.w<=0||pCrop.h<=0){cropEl.style.display='none';return;}
+    cropEl.style.display='block';
+    cropEl.style.left=pCrop.x+'px';cropEl.style.top=pCrop.y+'px';
+    cropEl.style.width=pCrop.w+'px';cropEl.style.height=pCrop.h+'px';
+  }
+
+  $('cropPatch').onclick=()=>{
+    if(!layers.length){alert('请先添加图片');return;}
+    renderStageToCanvas(pc);
+    po.style.display='flex';
+    pCrop={x:0,y:0,w:0,h:0};
+    cropDOM();
+    requestAnimationFrame(()=>fitPatchCanvas());
+  };
+
+  const beginSelect=e=>{
+    if(po.style.display==='none')return;
+    if(e.target===cropEl||cropEl.contains(e.target))return;
+    const rect=pc.getBoundingClientRect();
+    if(!rect.width||!rect.height)return;
+    const x=e.clientX-rect.left,y=e.clientY-rect.top;
+    if(x<0||y<0||x>rect.width||y>rect.height)return;
+    e.preventDefault();e.stopPropagation();
+    pSelecting=true;pStartX=x;pStartY=y;
+    pCrop={x,y,w:0,h:0};
+    cropDOM();
+  };
+  const moveSelect=e=>{
+    if(!pSelecting)return;
+    e.preventDefault();e.stopPropagation();
+    const rect=pc.getBoundingClientRect();
+    const x=Math.max(0,Math.min(rect.width,e.clientX-rect.left));
+    const y=Math.max(0,Math.min(rect.height,e.clientY-rect.top));
+    pCrop.x=Math.min(pStartX,x);pCrop.y=Math.min(pStartY,y);
+    pCrop.w=Math.abs(x-pStartX);pCrop.h=Math.abs(y-pStartY);
+    cropDOM();
+  };
+  const endSelect=()=>{pSelecting=false;};
+
+  pb.addEventListener('pointerdown',beginSelect);
+  pb.addEventListener('pointermove',moveSelect);
+  window.addEventListener('pointerup',endSelect);
+
+  cropEl.addEventListener('pointerdown',e=>{
+    e.preventDefault();e.stopPropagation();
+    if(!pCrop.w||!pCrop.h)return;
+    pDrag=true;pStartX=e.clientX;pStartY=e.clientY;pStartCrop={...pCrop};
+    cropEl.setPointerCapture?.(e.pointerId);
+  });
+  cropEl.addEventListener('pointermove',e=>{
+    if(!pDrag)return;
+    e.preventDefault();e.stopPropagation();
+    const dx=e.clientX-pStartX,dy=e.clientY-pStartY;
+    const W=pc.clientWidth,H=pc.clientHeight;
+    pCrop.x=Math.max(0,Math.min(W-pCrop.w,pStartCrop.x+dx));
+    pCrop.y=Math.max(0,Math.min(H-pCrop.h,pStartCrop.y+dy));
+    cropDOM();
+  });
+  window.addEventListener('pointerup',()=>{pDrag=false;});
+
+  $('cancelPatch').onclick=()=>{po.style.display='none';};
+
+  $('applyPatch').onclick=()=>{
+    if(!pc.width||pCrop.w<2||pCrop.h<2){alert('请先在画板上手动画出补丁区域');return;}
+    const sx=pc.width/Math.max(pc.clientWidth,1),sy=pc.height/Math.max(pc.clientHeight,1);
+    let x=Math.round(pCrop.x*sx),y=Math.round(pCrop.y*sy);
+    let w=Math.round(pCrop.w*sx),h=Math.round(pCrop.h*sy);
+    w=Math.max(1,Math.min(pc.width-x,w));
+    h=Math.max(1,Math.min(pc.height-y,h));
+    const out=document.createElement('canvas');
+    out.width=w;out.height=h;
+    out.getContext('2d').drawImage(pc,x,y,w,h,0,0,w,h);
+    const dataUrl=out.toDataURL('image/png');
+    po.style.display='none';
+    const sw=Math.max(1,pc.width);
+    const sh=Math.max(1,pc.height);
+    const patchX=(x+w/2)-sw/2;
+    const patchY=(y+h/2)-sh/2;
+    const prevCount=layers.length;
+    const below=active;
+    addLayer(dataUrl,false,{nw:w,nh:h,scaleX:1,scaleY:1,x:patchX,y:patchY,rotate:0,flip:false,opacity:1,locked:false});
+    const place=()=>{
+      if(layers.length<=prevCount){setTimeout(place,40);return;}
+      const newL=layers[layers.length-1];
+      layers.pop();
+      newL.nw=w;newL.nh=h;newL.scaleX=1;newL.scaleY=1;newL.x=patchX;newL.y=patchY;
+      if(below){const idx=layers.indexOf(below);if(idx>=0)layers.splice(idx,0,newL);else layers.push(newL);}
+      else layers.push(newL);
+      reorder();update(newL);setActive(newL);
+    };
+    setTimeout(place,40);
+  };
+})();
+
+/* 闪烁 */
+let blinkTimer=null, blinkOn=false, blinkOther=null;
+$('blink').onclick=()=>{
+  if(layers.length<2||!active)return;
+  if(blinkTimer){
+    clearInterval(blinkTimer);blinkTimer=null;blinkOn=false;
+    layers.forEach(l=>{l.el.style.visibility='';l.el.style.opacity=l.opacity;});
+    $('blink').textContent='👁️ 闪烁';
+    $('blink').classList.remove('primary');
+    return;
+  }
+  blinkOther=layers.find(l=>l!==active&&!l.bg)||layers.find(l=>l!==active);
+  if(!blinkOther)return;
+  $('blink').textContent='⏹️ 停止';
+  $('blink').classList.add('primary');
+  blinkOn=true;
+  blinkTimer=setInterval(()=>{
+    blinkOn=!blinkOn;
+    active.el.style.visibility=blinkOn?'visible':'hidden';
+    blinkOther.el.style.visibility=blinkOn?'hidden':'visible';
+  },280);
+};
+
+/* 差值 */
+let diffOn=false;
+$('diffBlend').onclick=()=>{
+  if(!active||layers.length<2)return;
+  diffOn=!diffOn;
+  if(diffOn){
+    active.el.style.mixBlendMode='difference';
+    $('diffBlend').textContent='⚡ 差值:开';
+    $('diffBlend').classList.add('primary');
+  }else{
+    active.el.style.mixBlendMode='normal';
+    $('diffBlend').textContent='⚡ 差值';
+    $('diffBlend').classList.remove('primary');
+  }
+};
+const _origSetActive=setActive;
+setActive=function(l){
+  if(diffOn&&active){active.el.style.mixBlendMode='normal';}
+  diffOn=false;
+  $('diffBlend').textContent='⚡ 差值';
+  $('diffBlend').classList.remove('primary');
+  _origSetActive(l);
+};
+
+/* 分屏同步缩放 */
+let syncZoomOn=false, viewScale=1, viewX=0, viewY=0;
+$('syncZoom').onclick=()=>{
+  syncZoomOn=!syncZoomOn;
+  $('syncZoom').textContent=syncZoomOn?'🔗 同步:开':'🔗 同步:关';
+  $('syncZoom').classList.toggle('primary',syncZoomOn);
+  if(!syncZoomOn){viewScale=1;viewX=0;viewY=0;applyViewTransform();}
+};
+function applyViewTransform(){
+  const t=`scale(${viewScale}) translate(${viewX}px,${viewY}px)`;
+  if(refStage) refStage.style.transform=t;
+  if(editStage) editStage.style.transform=t;
+  refStage&&(refStage.style.transformOrigin='center center');
+  editStage&&(editStage.style.transformOrigin='center center');
+}
+(function(){
+  let syncPinching=false, syncDist0=0, syncScale0=1, syncSx=0, syncSy=0, syncOx=0, syncOy=0, syncDragging=false;
+  const box=$('compareBox');
+  const onStart=e=>{
+    if(co.style.display!=='flex'||!syncZoomOn)return;
+    if(e.touches&&e.touches.length===2){
+      syncPinching=true;syncDragging=false;
+      const a=e.touches[0],b=e.touches[1];
+      syncDist0=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);
+      syncScale0=viewScale;return;
+    }
+    if(e.touches&&e.touches.length===1&&viewScale>1.05){
+      syncDragging=true;
+      const p=e.touches[0];
+      syncSx=p.clientX;syncSy=p.clientY;syncOx=viewX;syncOy=viewY;
+    }
+  };
+  const onMove=e=>{
+    if(co.style.display!=='flex'||!syncZoomOn)return;
+    if(e.touches&&e.touches.length===2&&syncPinching){
+      if(e.cancelable)e.preventDefault();
+      const a=e.touches[0],b=e.touches[1];
+      const d=Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY);
+      if(!syncDist0)return;
+      viewScale=Math.max(1,Math.min(4,syncScale0*(d/syncDist0)));
+      applyViewTransform();return;
+    }
+    if(syncDragging&&e.touches&&e.touches.length===1){
+      if(e.cancelable)e.preventDefault();
+      const p=e.touches[0];
+      viewX=syncOx+(p.clientX-syncSx)/viewScale;
+      viewY=syncOy+(p.clientY-syncSy)/viewScale;
+      applyViewTransform();
+    }
+  };
+  const onEnd=()=>{syncPinching=false;syncDragging=false;};
+  box.addEventListener('touchstart',onStart,{passive:false});
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('touchend',onEnd,{passive:false});
+})();
+const _origExit=$('exitCompare').onclick;
+$('exitCompare').onclick=()=>{
+  viewScale=1;viewX=0;viewY=0;syncZoomOn=false;
+  $('syncZoom').textContent='🔗 同步:关';
+  $('syncZoom').classList.remove('primary');
+  if(refStage)refStage.style.transform='';
+  if(editStage)editStage.style.transform='';
+  if(typeof _origExit==='function')_origExit();
+  else{co.style.display='none';compareRef=null;compareEdit=null;if(active){update(active);sync(active);}}
+};
+
+/* ============================================================
+   自动对齐人物（轮廓包围盒等比覆盖）
+   ============================================================ */
+(function(){
+  function setStatus(msg, show){
+    const el = $('autoMatchStatus');
+    if(!el) return;
+    if(show === false || !msg){el.style.display = 'none';el.textContent = '';}
+    else{el.style.display = '';el.textContent = msg;}
+  }
+
+  function analyzeSilhouette(imgEl){
+    if(!imgEl || !imgEl.complete || !imgEl.naturalWidth)throw new Error('图片未加载完成');
+    const nw = imgEl.naturalWidth, nh = imgEl.naturalHeight;
+    const maxE = 480;
+    const scale = Math.min(1, maxE / Math.max(nw, nh));
+    const cw = Math.max(1, Math.round(nw * scale));
+    const ch = Math.max(1, Math.round(nh * scale));
+    const c = document.createElement('canvas');
+    c.width = cw; c.height = ch;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(imgEl, 0, 0, cw, ch);
+    let data;
+    try{ data = ctx.getImageData(0, 0, cw, ch).data; }
+    catch(e){ throw new Error('无法读取像素（可能跨域）'); }
+
+    let opaque = 0, total = cw * ch;
+    for(let i = 3; i < data.length; i += 4){ if(data[i] >= 18) opaque++; }
+    const isCutout = opaque / Math.max(1, total) < 0.93;
+
+    let minX = cw, minY = ch, maxX = -1, maxY = -1;
+    let method = 'full';
+
+    if(isCutout){
+      const mask = new Uint8Array(cw * ch);
+      for(let y = 0; y < ch; y++){
+        for(let x = 0; x < cw; x++){
+          if(data[(y * cw + x) * 4 + 3] >= 18) mask[y * cw + x] = 1;
+        }
+      }
+      const eroded = new Uint8Array(cw * ch);
+      for(let y = 1; y < ch - 1; y++){
+        for(let x = 1; x < cw - 1; x++){
+          const p = y * cw + x;
+          if(mask[p] && mask[p-1] && mask[p+1] && mask[p-cw] && mask[p+cw]) eroded[p] = 1;
+        }
+      }
+      let useMask = eroded;
+      let cnt = 0;
+      for(let i = 0; i < eroded.length; i++) if(eroded[i]) cnt++;
+      if(cnt < Math.max(30, opaque * 0.3)) useMask = mask;
+
+      for(let y = 0; y < ch; y++){
+        for(let x = 0; x < cw; x++){
+          if(!useMask[y * cw + x]) continue;
+          if(x < minX) minX = x; if(y < minY) minY = y;
+          if(x > maxX) maxX = x; if(y > maxY) maxY = y;
+        }
+      }
+      method = 'cutout';
+    } else {
+      const skinMask = new Uint8Array(cw * ch);
+      let skinN = 0;
+      for(let y = 0; y < ch; y++){
+        for(let x = 0; x < cw; x++){
+          const i = (y * cw + x) * 4;
+          const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+          if(a < 40) continue;
+          if(r < 50 || r > 255 || g < 30 || g > 245 || b < 15 || b > 235) continue;
+          if(r < g - 8 || r < b - 8) continue;
+          const maxc = Math.max(r, g, b), minc = Math.min(r, g, b);
+          if(maxc <= 0) continue;
+          const sat = (maxc - minc) / maxc;
+          if(sat < 0.03 || sat > 0.85) continue;
+          const yy = 0.299 * r + 0.587 * g + 0.114 * b;
+          const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+          const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+          if(yy < 35 || yy > 248) continue;
+          if(cb < 77 || cb > 127 || cr < 133 || cr > 178) continue;
+          skinMask[y * cw + x] = 1;
+          skinN++;
+        }
+      }
+      if(skinN >= Math.max(40, total * 0.003)){
+        const visited = new Uint8Array(cw * ch);
+        let bestArea = 0, bestMinX = 0, bestMinY = 0, bestMaxX = 0, bestMaxY = 0;
+        const qx = new Int32Array(cw * ch);
+        const qy = new Int32Array(cw * ch);
+        for(let sy = 0; sy < ch; sy++){
+          for(let sx = 0; sx < cw; sx++){
+            const sp = sy * cw + sx;
+            if(!skinMask[sp] || visited[sp]) continue;
+            let head = 0, tail = 0;
+            qx[tail] = sx; qy[tail] = sy; tail++;
+            visited[sp] = 1;
+            let area = 0, bx0 = sx, by0 = sy, bx1 = sx, by1 = sy;
+            while(head < tail){
+              const cx = qx[head], cy = qy[head]; head++;
+              area++;
+              if(cx < bx0) bx0 = cx; if(cy < by0) by0 = cy;
+              if(cx > bx1) bx1 = cx; if(cy > by1) by1 = cy;
+              const nbs = [[cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]];
+              for(const [nx, ny] of nbs){
+                if(nx < 0 || ny < 0 || nx >= cw || ny >= ch) continue;
+                const np = ny * cw + nx;
+                if(!skinMask[np] || visited[np]) continue;
+                visited[np] = 1;
+                qx[tail] = nx; qy[tail] = ny; tail++;
+              }
+            }
+            if(area > bestArea){
+              bestArea = area;
+              bestMinX = bx0; bestMinY = by0; bestMaxX = bx1; bestMaxY = by1;
+            }
+          }
+        }
+        if(bestArea >= 30){
+          const bodyH = Math.max(8, bestMaxY - bestMinY);
+          const expandDown = Math.round(bodyH * 1.55);
+          const expandUp = Math.round(bodyH * 0.35);
+          const expandX = Math.round(bodyH * 0.28);
+          minX = Math.max(0, bestMinX - expandX);
+          maxX = Math.min(cw - 1, bestMaxX + expandX);
+          minY = Math.max(0, bestMinY - expandUp);
+          maxY = Math.min(ch - 1, bestMaxY + expandDown);
+          method = 'skin';
+        }
+      }
+      if(method === 'full'){
+        let sumL = 0, nL = 0;
+        const lum = new Float32Array(cw * ch);
+        for(let i = 0, p = 0; i < data.length; i += 4, p++){
+          const L = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+          lum[p] = L;
+          if(data[i+3] >= 40){ sumL += L; nL++; }
+        }
+        const meanL = nL ? sumL / nL : 128;
+        let thrCnt = 0;
+        for(let y = 0; y < ch; y++){
+          for(let x = 0; x < cw; x++){
+            const p = y * cw + x;
+            if(data[p * 4 + 3] < 40) continue;
+            if(Math.abs(lum[p] - meanL) < 28) continue;
+            thrCnt++;
+            if(x < minX) minX = x; if(y < minY) minY = y;
+            if(x > maxX) maxX = x; if(y > maxY) maxY = y;
+          }
+        }
+        if(thrCnt < 80 || maxX < minX){
+          minX = 0; minY = 0; maxX = cw - 1; maxY = ch - 1;
+        } else {
+          method = 'contrast';
+        }
+      }
+    }
+
+    if(maxX < minX || maxY < minY){
+      minX = 0; minY = 0; maxX = cw - 1; maxY = ch - 1;
+      method = 'full';
+    }
+
+    let x0 = minX / cw, y0 = minY / ch;
+    let x1 = (maxX + 1) / cw, y1 = (maxY + 1) / ch;
+    if(x1 - x0 < 0.04){ const mid = (x0 + x1) / 2; x0 = mid - 0.02; x1 = mid + 0.02; }
+    if(y1 - y0 < 0.06){ const mid = (y0 + y1) / 2; y0 = mid - 0.03; y1 = mid + 0.03; }
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0);
+    x1 = Math.min(1, x1); y1 = Math.min(1, y1);
+
+    const boxW = Math.max(0.04, x1 - x0);
+    const boxH = Math.max(0.05, y1 - y0);
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+
+    return {
+      isCutout,
+      method,
+      box: { x0, y0, x1, y1, w: boxW, h: boxH, cx, cy },
+      anchors: {
+        top:    { x: cx, y: y0 + boxH * 0.02 },
+        head:   { x: cx, y: y0 + boxH * 0.08 },
+        center: { x: cx, y: cy },
+        hip:    { x: cx, y: y0 + boxH * 0.55 },
+        bottom: { x: cx, y: y1 - boxH * 0.02 }
+      }
+    };
+  }
+
+  async function autoMatch(){
+    const btn = $('autoMatch');
+    if(btn && btn.disabled) return;
+    const bgLayer = layers.find(l => l.bg);
+    const fgLayer = active;
+    if(!bgLayer){ alert('请先添加背景图'); return; }
+    if(!fgLayer || fgLayer === bgLayer){ alert('请选中要对齐的贴图图层（点上方标签切换）'); return; }
+    if(!bgLayer.el || !bgLayer.el.complete || !bgLayer.el.naturalWidth){ alert('背景图还没加载完，请稍后重试'); return; }
+    if(!fgLayer.el || !fgLayer.el.complete || !fgLayer.el.naturalWidth){ alert('贴图还没加载完，请稍后重试'); return; }
+    if(fgLayer.locked){ alert('贴图已锁定，请先解锁'); return; }
+    if(fgLayer.rotate){
+      const ok = confirm('贴图当前有旋转角度，可能影响对齐精度。是否先把旋转归零？');
+      if(ok){ fgLayer.rotate = 0; update(fgLayer); sync(fgLayer); }
+    }
+
+    const oldText = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = '⏳ 处理中…'; }
+    setStatus('正在分析轮廓（离线，无需网络）…', true);
+
+    try{
+      await new Promise(r => setTimeout(r, 20));
+      setStatus('正在分析背景人物…');
+      const bgPose = analyzeSilhouette(bgLayer.el);
+      setStatus('正在分析贴图人物…');
+      const fgPose = analyzeSilhouette(fgLayer.el);
+
+      const methodLabel = { cutout:'抠图', skin:'肤色', contrast:'对比', full:'全图' };
+      setStatus(
+        '背景：' + (methodLabel[bgPose.method] || bgPose.method) +
+        ' · 贴图：' + (methodLabel[fgPose.method] || fgPose.method) +
+        ' · 按轮廓等比覆盖',
+        true
+      );
+
+      const bgSx = bgLayer.scaleX != null ? bgLayer.scaleX : 1;
+      const bgSy = bgLayer.scaleY != null ? bgLayer.scaleY : 1;
+      const fgSx0 = fgLayer.scaleX != null ? fgLayer.scaleX : 1;
+      const fgSy0 = fgLayer.scaleY != null ? fgLayer.scaleY : 1;
+
+      const bgBoxH = bgPose.box.h * bgLayer.nh * bgSy;
+      const bgBoxW = bgPose.box.w * bgLayer.nw * bgSx;
+      const fgBoxH = fgPose.box.h * fgLayer.nh * fgSy0;
+      const fgBoxW = fgPose.box.w * fgLayer.nw * fgSx0;
+
+      if(bgBoxH < 4 || fgBoxH < 4) throw new Error('人物区域过小，请换更清晰的全身/半身图');
+
+      const kH = bgBoxH / Math.max(1, fgBoxH);
+      const kW = bgBoxW / Math.max(1, fgBoxW);
+      let k = Math.max(kH, kW * 0.92);
+      if(kW > 0 && kH > 0 && (kW / kH > 1.8 || kH / kW > 1.8)){
+        k = kH;
+      }
+      k = Math.max(0.08, Math.min(4, k));
+
+      const newSx = Math.max(0.08, Math.min(4, fgSx0 * k));
+      const newSy = Math.max(0.08, Math.min(4, fgSy0 * k));
+      fgLayer.scaleX = newSx;
+      fgLayer.scaleY = newSy;
+
+      const stageW = stage.clientWidth || 1;
+      const stageH = stage.clientHeight || 1;
+
+      const bgA = bgPose.anchors.center;
+      const fgA = fgPose.anchors.center;
+
+      const bgScreenAX = stageW / 2 + (bgLayer.x || 0) + (bgA.x - 0.5) * bgLayer.nw * bgSx;
+      const bgScreenAY = stageH / 2 + (bgLayer.y || 0) + (bgA.y - 0.5) * bgLayer.nh * bgSy;
+      const fgScreenAX = stageW / 2 + (fgLayer.x || 0) + (fgA.x - 0.5) * fgLayer.nw * newSx;
+      const fgScreenAY = stageH / 2 + (fgLayer.y || 0) + (fgA.y - 0.5) * fgLayer.nh * newSy;
+
+      fgLayer.x = (fgLayer.x || 0) + (bgScreenAX - fgScreenAX);
+      fgLayer.y = (fgLayer.y || 0) + (bgScreenAY - fgScreenAY);
+
+      update(fgLayer);
+      sync(fgLayer);
+      tabs();
+
+      setStatus(
+        '✅ 等比覆盖完成 · 缩放 ×' + k.toFixed(2) +
+        '（高比 ' + kH.toFixed(2) + ' / 宽比 ' + kW.toFixed(2) + '）· 中心对齐',
+        true
+      );
+      setTimeout(() => setStatus('', false), 5500);
+    } catch(e){
+      console.warn('autoMatch failed', e);
+      setStatus('❌ ' + (e && e.message ? e.message : '对齐失败'), true);
+      setTimeout(() => setStatus('', false), 6000);
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = oldText || '🤖 自动对齐人物'; }
+      if(typeof window.__updateAutoMatchState === 'function') window.__updateAutoMatchState();
+    }
+  }
+
+  const btn = $('autoMatch');
+  if(btn) btn.addEventListener('click', autoMatch);
+  window.__updateAutoMatchState = function(){
+    const b = $('autoMatch');
+    if(!b) return;
+    const bg = layers.find(l => l.bg);
+    const ok = !!bg && !!active && active !== bg;
+    b.disabled = !ok;
+  };
+  window.__updateAutoMatchState();
+})();
+
+})();
+</script>
+</body>
+</html>
